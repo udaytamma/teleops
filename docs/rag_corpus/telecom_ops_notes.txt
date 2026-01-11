@@ -1,0 +1,4 @@
+In telecom networks, congestion on core routers can propagate to edge services and cause
+customer-impacting latency. Operators often validate root cause by correlating SNMP metrics
+(packet loss %, interface utilization) with topology dependencies. Remediation includes traffic
+engineering changes, temporary capacity shifts, and escalating if hardware faults are suspected.

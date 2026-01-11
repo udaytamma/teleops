@@ -1,0 +1,5 @@
+Network degradation incidents often present as elevated latency, increased packet loss, and jitter.
+Common causes include link congestion, interface errors, or routing instability. Evidence typically
+includes bursty loss metrics on core routers, correlated alarms across edge devices, and sustained
+latency spikes. Mitigation steps include rerouting traffic, applying QoS controls, and inspecting
+interface counters for errors or drops.

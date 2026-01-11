@@ -1,0 +1,14 @@
+fastapi==0.112.2
+uvicorn[standard]==0.30.6
+sqlalchemy==2.0.34
+pydantic==2.8.2
+pydantic-settings==2.4.0
+httpx==0.27.2
+streamlit==1.38.0
+requests==2.32.3
+llama-index-core==0.10.65
+llama-index-embeddings-huggingface==0.2.0
+llama-index-readers-file==0.1.30
+sentence-transformers==2.6.1
+google-generativeai==0.8.3
+pytest==8.3.2
