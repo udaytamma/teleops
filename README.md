@@ -108,6 +108,7 @@ teleops/
 - `docs/scenario_catalog.md`
 - `docs/demo_results.md`
 - `docs/demo_script.md`
+- `docs/demo_video_assets.md`
 - `docs/evaluation/labeling_rubric.md`
 - `docs/threat_model.md`
 - `docs/redaction_policy.md`

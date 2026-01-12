@@ -43,4 +43,5 @@
 ![Observability Dashboard](docs/assets/teleops-observability.png)
 
 ## Demo Video/GIF
-Add the walkthrough here: `[Demo video link](TBD)`
+Use the assets here until a video link is available:
+`docs/demo_video_assets.md`
