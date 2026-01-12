@@ -1,82 +1,32 @@
-"""LLM Response Viewer for TeleOps."""
+"""TeleOps LLM Response Viewer."""
 
 import os
-
 import requests
 import streamlit as st
+
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from theme import inject_theme, hero, card_start, card_end, card_header, divider, nav_links, badge, empty_state
 
 API_URL = os.getenv("TELEOPS_API_URL", "http://localhost:8000")
 API_TOKEN = os.getenv("TELEOPS_API_TOKEN", "")
 REQUEST_HEADERS = {"X-API-Key": API_TOKEN} if API_TOKEN else {}
 
 st.set_page_config(page_title="LLM Response Viewer", layout="wide")
+inject_theme()
 
-top_left, top_right = st.columns([5, 1])
-with top_right:
-    st.markdown(
-        "<div style='text-align:right;'>"
-        "<a href='/' style='color:#9BB0BF;text-decoration:none;font-size:14px;'>"
-        "Home</a></div>",
-        unsafe_allow_html=True,
-    )
+nav_links([
+    ("Dashboard", "/", False),
+    ("LLM Trace", "/LLM_Response", True),
+    ("Observability", "/Observability", False),
+], position="end")
 
-st.markdown(
-    """
-    <style>
-    :root {
-        --bg: #0B1318;
-        --panel: #111B22;
-        --ink: #E6F1F7;
-        --muted: #9BB0BF;
-        --border: #1C2A33;
-        --chip: #0B2A33;
-    }
-    .main { background: var(--bg); color: var(--ink); }
-    .teleops-card {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 16px;
-        box-shadow: 0 10px 24px rgba(0,0,0,0.25);
-    }
-    .teleops-title {
-        font-size: 18px;
-        font-weight: 600;
-        margin-bottom: 6px;
-        color: var(--ink);
-    }
-    .teleops-muted {
-        color: var(--muted);
-        font-size: 13px;
-    }
-    .teleops-divider {
-        height: 1px;
-        background: var(--border);
-        margin: 12px 0;
-    }
-    .teleops-chip {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 999px;
-        font-size: 12px;
-        background: var(--chip);
-        color: #A7F3E6;
-        border: 1px solid rgba(39,179,158,0.35);
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+st.write("")
 
-st.markdown(
-    """
-    <div class="teleops-card">
-        <span class="teleops-chip">LLM RCA CALL TRACE</span>
-        <div class="teleops-title">LLM Request / Response Viewer</div>
-        <div class="teleops-muted">Inspect the prompt inputs and structured output for a selected incident.</div>
-    </div>
-    """,
-    unsafe_allow_html=True,
+hero(
+    title="LLM Request / Response Viewer",
+    subtitle="Inspect prompt inputs, RAG context, and structured output for debugging.",
+    chip_text="LLM TRACE",
 )
 
 st.write("")
@@ -88,10 +38,10 @@ if incidents_resp.status_code >= 400:
 
 incidents = incidents_resp.json()
 if not incidents:
-    st.info("No incidents available. Generate a scenario first.")
+    empty_state("No incidents available. Generate a scenario first.", "")
     st.stop()
 
-selected = st.selectbox("Select incident", options=incidents, format_func=lambda i: i["id"])
+selected = st.selectbox("Select Incident", options=incidents, format_func=lambda i: f"{i['id'][:12]}... - {i.get('summary', 'No summary')[:40]}")
 
 artifact_resp = requests.get(
     f"{API_URL}/rca/{selected['id']}/latest",
@@ -99,28 +49,17 @@ artifact_resp = requests.get(
     headers=REQUEST_HEADERS,
     timeout=30,
 )
+
 if artifact_resp.status_code == 404:
-    st.warning("No LLM RCA found for this incident. Run LLM RCA to generate a response.")
+    st.warning("No LLM RCA found for this incident.")
     if st.button("Run LLM RCA", type="primary"):
-        run_resp = requests.post(
-            f"{API_URL}/rca/{selected['id']}/llm",
-            headers=REQUEST_HEADERS,
-            timeout=60,
-        )
+        with st.spinner("Running LLM RCA..."):
+            run_resp = requests.post(f"{API_URL}/rca/{selected['id']}/llm", headers=REQUEST_HEADERS, timeout=60)
         if run_resp.status_code >= 400:
             st.error(run_resp.text)
-            st.stop()
-        artifact_resp = requests.get(
-            f"{API_URL}/rca/{selected['id']}/latest",
-            params={"source": "llm"},
-            headers=REQUEST_HEADERS,
-            timeout=30,
-        )
-        if artifact_resp.status_code >= 400:
-            st.error(artifact_resp.text)
-            st.stop()
-    else:
-        st.stop()
+        else:
+            st.rerun()
+    st.stop()
 elif artifact_resp.status_code >= 400:
     st.error(artifact_resp.text)
     st.stop()
@@ -133,40 +72,45 @@ llm_response = evidence.get("llm_response", {})
 left, right = st.columns(2, gap="large")
 
 with left:
-    st.markdown('<div class="teleops-card">', unsafe_allow_html=True)
-    st.markdown('<div class="teleops-title">LLM Request</div>', unsafe_allow_html=True)
-    st.markdown('<div class="teleops-muted">Incident, sampled alerts, and RAG context.</div>', unsafe_allow_html=True)
-    st.markdown('<div class="teleops-divider"></div>', unsafe_allow_html=True)
+    card_start()
+    card_header("LLM Request", "Incident context, alerts, and RAG chunks sent to model")
 
-    st.markdown("**Incident**")
+    st.markdown("**Incident Context**")
     st.json(llm_request.get("incident", {}))
 
+    divider()
+
     st.markdown("**Alerts Sample**")
-    alerts_sample = llm_request.get("alerts_sample", [])
-    if alerts_sample:
-        st.json(alerts_sample)
+    alerts = llm_request.get("alerts_sample", [])
+    if alerts:
+        st.json(alerts[:5])
+        if len(alerts) > 5:
+            st.caption(f"+ {len(alerts) - 5} more alerts")
     else:
-        st.write("No alert sample recorded.")
+        st.markdown("<p style='color: var(--ink-dim);'>No alerts recorded</p>", unsafe_allow_html=True)
+
+    divider()
 
     st.markdown("**RAG Context**")
-    rag_context = llm_request.get("rag_context", [])
-    if rag_context:
-        for idx, item in enumerate(rag_context, start=1):
-            st.write(f"{idx}. {item}")
+    rag = llm_request.get("rag_context", [])
+    if rag:
+        for idx, chunk in enumerate(rag, 1):
+            st.markdown(f"**Chunk {idx}:**")
+            st.markdown(f"<div style='background: var(--bg); padding: 12px; border-radius: 8px; font-size: 13px; color: var(--ink-muted); margin-bottom: 8px;'>{chunk[:300]}{'...' if len(chunk) > 300 else ''}</div>", unsafe_allow_html=True)
     else:
-        st.write("No RAG context recorded.")
+        st.markdown("<p style='color: var(--ink-dim);'>No RAG context</p>", unsafe_allow_html=True)
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    card_end()
 
 with right:
-    st.markdown('<div class="teleops-card">', unsafe_allow_html=True)
-    st.markdown('<div class="teleops-title">LLM Response</div>', unsafe_allow_html=True)
-    st.markdown('<div class="teleops-muted">Structured output from the LLM.</div>', unsafe_allow_html=True)
-    st.markdown('<div class="teleops-divider"></div>', unsafe_allow_html=True)
+    card_start("accent")
+    card_header("LLM Response", "Structured JSON output from the model")
 
     if llm_response:
+        st.markdown(f"{badge(artifact.get('model', 'unknown'), 'accent')} &nbsp; {badge(artifact.get('generated_at', '')[:19], 'muted')}", unsafe_allow_html=True)
+        st.write("")
         st.json(llm_response)
     else:
-        st.write("No response recorded.")
+        empty_state("No response recorded", "")
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    card_end()

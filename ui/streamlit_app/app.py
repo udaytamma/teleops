@@ -1,290 +1,199 @@
-"""Streamlit UI for TeleOps."""
+"""TeleOps Network Incident Command - Main Dashboard.
+
+A professional NOC-style interface for incident correlation, RCA generation,
+and baseline vs LLM comparison.
+"""
 
 import os
 
 import requests
 import streamlit as st
 
+from theme import (
+    inject_theme,
+    hero,
+    card_start,
+    card_end,
+    card_header,
+    divider,
+    severity_badge,
+    badge,
+    nav_links,
+    confidence_gauge,
+    empty_state,
+)
+
 API_URL = os.getenv("TELEOPS_API_URL", "http://localhost:8000")
 API_TOKEN = os.getenv("TELEOPS_API_TOKEN", "")
 REQUEST_HEADERS = {"X-API-Key": API_TOKEN} if API_TOKEN else {}
 
-
-def _confidence_color(value: float) -> str:
-    if value >= 0.8:
-        return "#2E7D32"
-    if value >= 0.6:
-        return "#558B2F"
-    if value >= 0.4:
-        return "#F9A825"
-    return "#C62828"
-
-
-def _badge(text: str, bg: str) -> str:
-    return (
-        f"<span style=\"display:inline-block;padding:2px 8px;border-radius:999px;"
-        f"background:{bg};color:white;font-size:12px;\">{text}</span>"
-    )
+SCENARIOS = {
+    "network_degradation": ("Network Degradation", "Packet loss and latency issues"),
+    "dns_outage": ("DNS Outage", "DNS resolution failures"),
+    "bgp_flap": ("BGP Flap", "Route instability and withdrawals"),
+    "fiber_cut": ("Fiber Cut", "Physical transport failure"),
+    "router_freeze": ("Router Freeze", "Control plane lockup"),
+    "isp_peering_congestion": ("ISP Peering Congestion", "Inter-carrier bottleneck"),
+    "ddos_edge": ("DDoS Attack", "Volumetric attack on edge"),
+    "mpls_vpn_leak": ("MPLS/VPN Leak", "Label stack misconfiguration"),
+    "cdn_cache_stampede": ("CDN Stampede", "Cache invalidation cascade"),
+    "firewall_rule_misconfig": ("Firewall Misconfig", "Blocked ports/ACL error"),
+    "database_latency_spike": ("Database Latency", "MSP app backend slowdown"),
+}
 
 
-def render_rca(title: str, payload: dict) -> None:
-    st.markdown(f"**{title}**")
-    st.caption("Structured RCA output with hypotheses, evidence, and confidence.")
+def render_rca_panel(title: str, payload: dict, is_llm: bool = False) -> None:
+    """Render an RCA result panel with hypotheses, confidence, and evidence."""
+    panel_class = "teleops-rca-llm" if is_llm else "teleops-rca-baseline"
+    st.markdown(f'<div class="{panel_class}">', unsafe_allow_html=True)
+
+    st.markdown(f"### {title}")
 
     summary = payload.get("incident_summary", "N/A")
     model = payload.get("model", "unknown")
-    generated_at = payload.get("generated_at", "unknown")
+    generated_at = payload.get("generated_at", "")
     hypotheses = payload.get("hypotheses", [])
     confidence = payload.get("confidence_scores", {})
     evidence = payload.get("evidence", {})
 
-    header = st.container(border=True)
-    with header:
-        st.markdown("**Incident Summary**")
-        st.write(summary)
-        st.markdown("**Run Metadata**")
-        st.markdown(
-            f"{_badge('Model', '#3949AB')} &nbsp; <b>{model}</b>",
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            f"{_badge('Generated', '#546E7A')} &nbsp; <b>{generated_at}</b>",
-            unsafe_allow_html=True,
-        )
+    # Metadata badges
+    st.markdown(
+        f'{badge(model, "accent")} &nbsp; {badge(generated_at[:19] if generated_at else "N/A", "muted")}',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("**Incident Summary**")
+    st.markdown(f"<p style='color: var(--ink-muted); font-size: 14px;'>{summary}</p>", unsafe_allow_html=True)
+
+    divider()
 
     st.markdown("**Hypotheses**")
     if hypotheses:
         for idx, item in enumerate(hypotheses, start=1):
-            st.write(f"{idx}. {item}")
+            st.markdown(
+                f"<div style='display: flex; gap: 12px; margin-bottom: 8px;'>"
+                f"<span style='color: var(--accent); font-weight: 600; font-family: JetBrains Mono;'>{idx}.</span>"
+                f"<span style='color: var(--ink);'>{item}</span></div>",
+                unsafe_allow_html=True,
+            )
     else:
-        st.write("No hypotheses returned.")
+        st.markdown("<p style='color: var(--ink-dim);'>No hypotheses returned.</p>", unsafe_allow_html=True)
 
-    st.markdown("**Confidence**")
+    divider()
+
+    st.markdown("**Confidence Scores**")
     if confidence:
         for key, value in confidence.items():
-            level = min(max(float(value), 0.0), 1.0)
-            color = _confidence_color(level)
-            arc = 157 * level
-            gauge = f"""
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
-              <svg width="120" height="70" viewBox="0 0 120 70">
-                <path d="M10,60 A50,50 0 0,1 110,60" stroke="#1C2A33" stroke-width="12" fill="none"/>
-                <path d="M10,60 A50,50 0 0,1 110,60" stroke="{color}" stroke-width="12" fill="none"
-                  stroke-dasharray="{arc} 999"/>
-                <circle cx="60" cy="60" r="6" fill="{color}"/>
-                <text x="60" y="50" text-anchor="middle" font-size="16" fill="#E6F1F7">{level:.2f}</text>
-              </svg>
-              <div style="color:#E6F1F7;font-size:15px;line-height:1.3;max-width:420px;">{key}</div>
-            </div>
-            """
-            st.markdown(gauge, unsafe_allow_html=True)
+            st.markdown(confidence_gauge(value, key), unsafe_allow_html=True)
     else:
-        st.write("No confidence scores returned.")
+        st.markdown("<p style='color: var(--ink-dim);'>No confidence data.</p>", unsafe_allow_html=True)
+
+    divider()
 
     st.markdown("**Evidence**")
     if evidence:
-        st.json(evidence)
+        with st.expander("View evidence details", expanded=False):
+            st.json(evidence)
     else:
-        st.write("No evidence returned.")
+        st.markdown("<p style='color: var(--ink-dim);'>No evidence recorded.</p>", unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
-st.set_page_config(page_title="TeleOps Console", layout="wide")
+# Page configuration
+st.set_page_config(
+    page_title="TeleOps Console",
+    page_icon="",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-SCENARIOS = {
-    "network_degradation": "Network degradation (packet loss/latency)",
-    "dns_outage": "DNS outage",
-    "bgp_flap": "BGP flap",
-    "fiber_cut": "Fiber cut",
-    "router_freeze": "Router freeze",
-    "isp_peering_congestion": "ISP peering congestion",
-    "ddos_edge": "DDoS attack on edge",
-    "mpls_vpn_leak": "MPLS/L3VPN leak",
-    "cdn_cache_stampede": "CDN cache stampede",
-    "firewall_rule_misconfig": "Firewall rule misconfig / blocked port",
-    "database_latency_spike": "Database latency spike (MSP hosted apps)",
-}
+# Inject theme
+inject_theme()
 
-top_left, top_right = st.columns([5, 1])
-with top_right:
+# Navigation
+nav_links([
+    ("Dashboard", "/", True),
+    ("LLM Trace", "/LLM_Response", False),
+    ("Observability", "/Observability", False),
+], position="end")
+
+st.write("")
+
+# Hero section
+hero(
+    title="Network Incident Command",
+    subtitle="Correlate NOC alerts into incidents, validate hypotheses, and compare baseline vs LLM-driven RCA with evidence.",
+    chip_text="TELEOPS LIVE",
+)
+
+st.write("")
+
+# Sidebar - Scenario Builder
+with st.sidebar:
     st.markdown(
-        "<div style='text-align:right;'>"
-        "<a href='LLM_Response' style='color:#9BB0BF;text-decoration:none;font-size:14px;'>"
-        "View LLM Response</a>"
-        " &nbsp; | &nbsp; "
-        "<a href='Observability' style='color:#9BB0BF;text-decoration:none;font-size:14px;'>"
-        "Observability</a></div>",
+        """
+        <div style="margin-bottom: 24px;">
+            <h2 style="font-size: 18px; font-weight: 600; color: var(--ink-strong); margin: 0;">
+                Scenario Builder
+            </h2>
+            <p style="font-size: 13px; color: var(--ink-dim); margin: 4px 0 0 0;">
+                Generate synthetic incidents for testing
+            </p>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
-st.markdown(
-    """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
-    :root {
-        --bg: #0B1318;
-        --panel: #111B22;
-        --panel-2: #0F1A20;
-        --ink: #E6F1F7;
-        --muted: #9BB0BF;
-        --accent: #21B6A8;
-        --accent-2: #D88C2B;
-        --border: #1C2A33;
-        --chip: #0B2A33;
-        --ink-strong: #F4FBFF;
-    }
-    html, body, .main { font-size: 17px; font-family: 'Space Grotesk', sans-serif; }
-    .main { background: var(--bg); color: var(--ink); }
-    .teleops-hero {
-        padding: 20px 24px;
-        border-radius: 16px;
-        background:
-            radial-gradient(circle at 18% 15%, rgba(33,182,168,0.22), transparent 45%),
-            radial-gradient(circle at 82% 25%, rgba(216,140,43,0.22), transparent 40%),
-            linear-gradient(135deg, #0F1A20 0%, #101B24 100%);
-        border: 1px solid var(--border);
-        position: relative;
-        overflow: hidden;
-    }
-    .teleops-hero::after {
-        content: "";
-        position: absolute;
-        right: -40px;
-        top: -40px;
-        width: 180px;
-        height: 180px;
-        border: 1px dashed rgba(39,179,158,0.35);
-        border-radius: 50%;
-    }
-    .teleops-hero h1 {
-        margin: 0;
-        font-size: 30px;
-        color: var(--ink-strong);
-        letter-spacing: 0.4px;
-    }
-    .teleops-hero p {
-        margin: 6px 0 0 0;
-        color: var(--muted);
-    }
-    .teleops-chip {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 999px;
-        font-size: 12px;
-        background: var(--chip);
-        color: #A7F3E6;
-        border: 1px solid rgba(39,179,158,0.35);
-        letter-spacing: 0.4px;
-        font-family: 'IBM Plex Mono', monospace;
-    }
-    .teleops-card {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 16px;
-        box-shadow: 0 10px 24px rgba(0,0,0,0.25);
-    }
-    .teleops-title {
-        font-size: 17px;
-        font-weight: 600;
-        margin-bottom: 6px;
-        color: var(--ink-strong);
-    }
-    .teleops-muted {
-        color: var(--muted);
-        font-size: 12px;
-    }
-    .teleops-divider {
-        height: 1px;
-        background: var(--border);
-        margin: 12px 0;
-    }
-    .teleops-severity-critical {
-        color: #FF6B6B;
-        font-size: 15px;
-        font-weight: 700;
-        letter-spacing: 0.3px;
-    }
-    .teleops-severity {
-        color: #A8C7D8;
-        font-size: 15px;
-        font-weight: 600;
-        letter-spacing: 0.2px;
-    }
-    .stButton > button {
-        background: linear-gradient(135deg, #27B39E 0%, #1E8A7A 100%);
-        color: #0B1318;
-        border: none;
-        padding: 10px 18px;
-        border-radius: 10px;
-        font-weight: 600;
-        font-size: 14px;
-        width: 100%;
-    }
-    .teleops-clear-btn button {
-        background: transparent !important;
-        border: 1px solid #1C2A33 !important;
-        color: #9BB0BF !important;
-        font-weight: 500 !important;
-        padding: 6px 12px !important;
-        width: auto !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-st.markdown(
-    """
-    <div class="teleops-hero">
-        <span class="teleops-chip">TELCO OPS • LIVE RCA</span>
-        <h1>Network Incident Command</h1>
-        <p>Correlate NOC alerts into incidents, validate hypotheses, and compare
-        rules vs LLM-driven RCA with evidence.</p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-st.write("")
-
-with st.sidebar:
-    st.header("Scenario Builder")
-    st.caption("Create synthetic alerts and incidents for repeatable testing.")
     scenario = st.selectbox(
-        "Scenario type",
+        "Incident Type",
         options=list(SCENARIOS.keys()),
-        format_func=lambda key: SCENARIOS[key],
-    )
-    st.caption(f"Selected: {SCENARIOS[scenario]}")
-    alert_rate = st.number_input(
-        "Alert rate per minute",
-        min_value=1,
-        max_value=100,
-        value=20,
-        help="Number of incident-related alerts generated per minute.",
-    )
-    duration = st.number_input(
-        "Duration (minutes)",
-        min_value=1,
-        max_value=60,
-        value=10,
-        help="Total length of the simulated incident window.",
-    )
-    noise_rate = st.number_input(
-        "Noise alerts per minute",
-        min_value=0,
-        max_value=50,
-        value=5,
-        help="Number of unrelated alerts per minute to simulate background noise.",
-    )
-    seed = st.number_input(
-        "Seed",
-        min_value=0,
-        max_value=9999,
-        value=42,
-        help="Deterministic seed for repeatable scenarios.",
+        format_func=lambda key: SCENARIOS[key][0],
     )
 
-    if st.button("Generate Scenario", help="Generate alerts, correlate incidents, and store ground truth."):
+    st.caption(SCENARIOS[scenario][1])
+
+    st.markdown('<div style="height: 8px;"></div>', unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        alert_rate = st.number_input(
+            "Alert/min",
+            min_value=1,
+            max_value=100,
+            value=20,
+            help="Alerts generated per minute",
+        )
+    with col2:
+        duration = st.number_input(
+            "Duration",
+            min_value=1,
+            max_value=60,
+            value=10,
+            help="Incident duration in minutes",
+        )
+
+    col3, col4 = st.columns(2)
+    with col3:
+        noise_rate = st.number_input(
+            "Noise/min",
+            min_value=0,
+            max_value=50,
+            value=5,
+            help="Background noise alerts",
+        )
+    with col4:
+        seed = st.number_input(
+            "Seed",
+            min_value=0,
+            max_value=9999,
+            value=42,
+            help="Random seed for reproducibility",
+        )
+
+    st.markdown('<div style="height: 16px;"></div>', unsafe_allow_html=True)
+
+    if st.button("Generate Scenario", use_container_width=True):
         payload = {
             "incident_type": scenario,
             "alert_rate_per_min": alert_rate,
@@ -292,22 +201,20 @@ with st.sidebar:
             "noise_rate_per_min": noise_rate,
             "seed": seed,
         }
-        resp = requests.post(f"{API_URL}/generate", json=payload, headers=REQUEST_HEADERS, timeout=30)
+        with st.spinner("Generating..."):
+            resp = requests.post(f"{API_URL}/generate", json=payload, headers=REQUEST_HEADERS, timeout=30)
         if resp.status_code >= 400:
-            st.error(resp.text)
+            st.error(f"Error: {resp.text}")
         else:
-            st.success("Scenario generated")
-            with st.expander("Show generation details", expanded=False):
+            st.success("Scenario generated successfully")
+            with st.expander("Generation details"):
                 st.json(resp.json())
 
-st.markdown('<div class="teleops-card">', unsafe_allow_html=True)
-st.markdown('<div class="teleops-title">Incident Queue</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="teleops-muted">Latest correlated incidents from synthetic runs.</div>',
-    unsafe_allow_html=True,
-)
-st.markdown('<div class="teleops-divider"></div>', unsafe_allow_html=True)
+# Main content - Incident Queue
+card_start("accent")
+card_header("Incident Queue", "Active incidents from synthetic runs")
 
+# Fetch incidents
 incidents_resp = requests.get(f"{API_URL}/incidents", headers=REQUEST_HEADERS, timeout=30)
 if incidents_resp.status_code >= 400:
     st.error(incidents_resp.text)
@@ -316,110 +223,135 @@ else:
     incidents = incidents_resp.json()
 
 if incidents:
+    # Stats bar
+    critical_count = sum(1 for i in incidents if (i.get("severity") or "").lower() == "critical")
+    high_count = sum(1 for i in incidents if (i.get("severity") or "").lower() == "high")
+    open_count = sum(1 for i in incidents if (i.get("status") or "").lower() != "resolved")
+
+    st.markdown(
+        f"""
+        <div class="teleops-stats-bar">
+            <div class="teleops-stat">
+                <span class="teleops-stat-value" style="color: var(--critical);">{critical_count}</span>
+                <span class="teleops-stat-label">Critical</span>
+            </div>
+            <div class="teleops-stat">
+                <span class="teleops-stat-value" style="color: var(--accent-2);">{high_count}</span>
+                <span class="teleops-stat-label">High</span>
+            </div>
+            <div class="teleops-stat">
+                <span class="teleops-stat-value">{open_count}</span>
+                <span class="teleops-stat-label">Open</span>
+            </div>
+            <div class="teleops-stat">
+                <span class="teleops-stat-value" style="color: var(--accent);">{len(incidents)}</span>
+                <span class="teleops-stat-label">Total</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Filters
     severities = sorted({(item.get("severity") or "unknown") for item in incidents})
     statuses = sorted({(item.get("status") or "unknown") for item in incidents})
-else:
-    severities = []
-    statuses = []
 
-filters = st.container()
-with filters:
-    filter_cols = st.columns(2)
+    filter_cols = st.columns([1, 1, 2])
     with filter_cols[0]:
-        severity_filter = st.multiselect("Severity filter", options=severities, default=severities)
+        severity_filter = st.multiselect("Severity", options=severities, default=severities, label_visibility="collapsed")
     with filter_cols[1]:
-        status_filter = st.multiselect("Status filter", options=statuses, default=statuses)
+        status_filter = st.multiselect("Status", options=statuses, default=statuses, label_visibility="collapsed")
 
-filtered_incidents = [
-    item
-    for item in incidents
-    if (not severity_filter or item.get("severity") in severity_filter)
-    and (not status_filter or item.get("status") in status_filter)
-]
+    filtered_incidents = [
+        item for item in incidents
+        if (not severity_filter or item.get("severity") in severity_filter)
+        and (not status_filter or item.get("status") in status_filter)
+    ]
 
-if not filtered_incidents:
-    st.info("No incidents yet. Generate a scenario.")
-else:
-    row = st.columns([1.2, 2.2, 0.8, 1.1])
-    with row[0]:
-        selected = st.selectbox(
-            "Incident",
-            options=filtered_incidents,
-            format_func=lambda i: i["id"],
-            label_visibility="collapsed",
-        )
-        st.markdown("<div class='teleops-clear-btn'>", unsafe_allow_html=True)
-        if st.button("Clear Incidents", help="Delete all alerts, incidents, and RCA artifacts."):
+    if filtered_incidents:
+        divider()
+
+        # Incident selector row
+        row = st.columns([1.5, 3, 1, 1.5])
+        with row[0]:
+            selected = st.selectbox(
+                "Select Incident",
+                options=filtered_incidents,
+                format_func=lambda i: i["id"][:12] + "...",
+                label_visibility="collapsed",
+            )
+        with row[1]:
+            st.markdown(f"<p style='margin: 8px 0; color: var(--ink);'>{selected.get('summary', 'No summary')}</p>", unsafe_allow_html=True)
+        with row[2]:
+            st.markdown(severity_badge(selected.get("severity")), unsafe_allow_html=True)
+        with row[3]:
+            run_rca = st.button("Run RCA", type="primary", use_container_width=True)
+
+        # Clear button
+        st.markdown('<div class="teleops-btn-secondary" style="margin-top: 12px;">', unsafe_allow_html=True)
+        if st.button("Clear All Incidents", use_container_width=True):
             resp = requests.post(f"{API_URL}/reset", headers=REQUEST_HEADERS, timeout=30)
             if resp.status_code >= 400:
                 st.error(resp.text)
             else:
-                st.success("All incidents cleared.")
+                st.success("All incidents cleared")
+                st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
-    with row[1]:
-        st.markdown("**Summary**")
-        st.write(selected.get("summary"))
-    with row[2]:
-        st.markdown("**Severity**")
-        severity = (selected.get("severity") or "").lower()
-        severity_class = "teleops-severity-critical" if severity == "critical" else "teleops-severity"
-        st.markdown(
-            f"<span class='{severity_class}'>{selected.get('severity')}</span>",
-            unsafe_allow_html=True,
-        )
-    with row[3]:
-        st.markdown("**Actions**")
-        if st.button(
-            "Run RCA",
-            help="Run baseline and LLM RCA for side-by-side comparison.",
-            type="primary",
-        ):
-            baseline_resp = requests.post(
-                f"{API_URL}/rca/{selected['id']}/baseline",
-                headers=REQUEST_HEADERS,
-                timeout=30,
-            )
+
+        if run_rca:
+            with st.spinner("Running baseline RCA..."):
+                baseline_resp = requests.post(
+                    f"{API_URL}/rca/{selected['id']}/baseline",
+                    headers=REQUEST_HEADERS,
+                    timeout=30,
+                )
             if baseline_resp.status_code >= 400:
                 st.error(f"Baseline RCA failed: {baseline_resp.text}")
             else:
                 st.session_state["baseline_rca"] = baseline_resp.json()
 
-            llm_resp = requests.post(
-                f"{API_URL}/rca/{selected['id']}/llm",
-                headers=REQUEST_HEADERS,
-                timeout=60,
-            )
+            with st.spinner("Running LLM RCA..."):
+                llm_resp = requests.post(
+                    f"{API_URL}/rca/{selected['id']}/llm",
+                    headers=REQUEST_HEADERS,
+                    timeout=60,
+                )
             if llm_resp.status_code >= 400:
                 st.error(f"LLM RCA failed: {llm_resp.text}")
             else:
                 st.session_state["llm_rca"] = llm_resp.json()
+    else:
+        empty_state("No incidents match filters", "")
+else:
+    empty_state("No incidents yet. Generate a scenario to begin.", "")
 
-st.markdown("</div>", unsafe_allow_html=True)
+card_end()
 
 st.write("")
-st.markdown('<div class="teleops-card">', unsafe_allow_html=True)
-st.markdown('<div class="teleops-title">Incident Context</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="teleops-muted">Key metadata and alert sample for the selected incident.</div>',
-    unsafe_allow_html=True,
-)
-st.markdown('<div class="teleops-divider"></div>', unsafe_allow_html=True)
 
-if filtered_incidents:
+# Incident Context Card
+if incidents and filtered_incidents:
+    card_start()
+    card_header("Incident Context", "Metadata and alert sample for selected incident")
+
     context_cols = st.columns(4)
     with context_cols[0]:
         st.markdown("**Status**")
-        st.write(selected.get("status", "unknown"))
+        status = selected.get("status", "unknown")
+        status_color = "var(--success)" if status.lower() == "resolved" else "var(--info)"
+        st.markdown(f"<span style='color: {status_color}; font-weight: 500;'>{status}</span>", unsafe_allow_html=True)
     with context_cols[1]:
         st.markdown("**Impact**")
-        st.write(selected.get("impact_scope", "unknown"))
+        st.markdown(f"<span style='color: var(--ink-muted);'>{selected.get('impact_scope', 'unknown')}</span>", unsafe_allow_html=True)
     with context_cols[2]:
         st.markdown("**Owner**")
-        st.write(selected.get("owner") or "unassigned")
+        st.markdown(f"<span style='color: var(--ink-muted);'>{selected.get('owner') or 'Unassigned'}</span>", unsafe_allow_html=True)
     with context_cols[3]:
         st.markdown("**Alerts**")
-        st.write(len(selected.get("related_alert_ids", [])))
+        alert_count = len(selected.get("related_alert_ids", []))
+        st.markdown(f"<span style='color: var(--accent); font-family: JetBrains Mono; font-weight: 600;'>{alert_count}</span>", unsafe_allow_html=True)
 
+    # Fetch and display alerts
     alert_resp = requests.get(
         f"{API_URL}/incidents/{selected['id']}/alerts",
         headers=REQUEST_HEADERS,
@@ -428,44 +360,44 @@ if filtered_incidents:
     if alert_resp.status_code >= 400:
         st.error(alert_resp.text)
     else:
-        alert_rows = []
-        for alert in alert_resp.json():
-            alert_rows.append(
-                {
-                    "timestamp": alert.get("timestamp"),
-                    "host": alert.get("host"),
-                    "service": alert.get("service"),
-                    "severity": alert.get("severity"),
-                    "type": alert.get("alert_type"),
-                    "message": alert.get("message"),
-                }
-            )
-        with st.expander("Alert sample (first 12)", expanded=False):
-            st.dataframe(alert_rows[:12], use_container_width=True)
+        alert_rows = [
+            {
+                "timestamp": a.get("timestamp", "")[:19],
+                "host": a.get("host", ""),
+                "service": a.get("service", ""),
+                "severity": a.get("severity", ""),
+                "type": a.get("alert_type", ""),
+                "message": a.get("message", "")[:60] + "..." if len(a.get("message", "")) > 60 else a.get("message", ""),
+            }
+            for a in alert_resp.json()[:12]
+        ]
+        with st.expander(f"Alert sample (showing {len(alert_rows)} of {alert_count})"):
+            st.dataframe(alert_rows, use_container_width=True, hide_index=True)
 
-st.markdown("</div>", unsafe_allow_html=True)
+    card_end()
 
 st.write("")
-st.markdown('<div class="teleops-card">', unsafe_allow_html=True)
-st.markdown('<div class="teleops-title">RCA Output</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="teleops-muted">Compare baseline vs LLM results with confidence and evidence.</div>',
-    unsafe_allow_html=True,
-)
-st.markdown('<div class="teleops-divider"></div>', unsafe_allow_html=True)
+
+# RCA Output Card
+card_start()
+card_header("RCA Comparison", "Baseline (rule-based) vs LLM (AI-powered) analysis")
 
 baseline_payload = st.session_state.get("baseline_rca")
 llm_payload = st.session_state.get("llm_rca")
 
 if not baseline_payload and not llm_payload:
-    st.info("Run RCA to view baseline and LLM results.")
+    empty_state("Select an incident and click 'Run RCA' to compare baseline and LLM results.", "")
 else:
-    left, right = st.columns(2)
+    left, right = st.columns(2, gap="large")
     with left:
         if baseline_payload:
-            render_rca("Baseline RCA", baseline_payload)
+            render_rca_panel("Baseline RCA", baseline_payload, is_llm=False)
+        else:
+            empty_state("Baseline RCA not available", "")
     with right:
         if llm_payload:
-            render_rca("LLM RCA", llm_payload)
+            render_rca_panel("LLM RCA", llm_payload, is_llm=True)
+        else:
+            empty_state("LLM RCA not available", "")
 
-st.markdown("</div>", unsafe_allow_html=True)
+card_end()
