@@ -1,8 +1,7 @@
-"""TeleOps - Entry point that redirects to Incident Generator."""
+"""TeleOps entry point - immediately redirects to Incident Generator."""
 
 import streamlit as st
 
-st.set_page_config(page_title="TeleOps", layout="wide")
-
-# Redirect to main page
+# Hide this page from sidebar by not setting any page config with a title
+# and immediately redirecting
 st.switch_page("pages/1_Incident_Generator.py")
