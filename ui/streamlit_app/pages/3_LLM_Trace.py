@@ -16,9 +16,9 @@ st.set_page_config(page_title="LLM Response Viewer", layout="wide")
 inject_theme()
 
 nav_links([
-    ("Dashboard", "/", False),
-    ("LLM Trace", "/LLM_Response", True),
-    ("Observability", "/Observability", False),
+    ("Incident Generator", "/1_Incident_Generator", False),
+    ("LLM Trace", "/3_LLM_Trace", True),
+    ("Observability", "/2_Observability", False),
 ], position="end")
 
 st.write("")

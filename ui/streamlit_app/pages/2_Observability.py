@@ -16,9 +16,9 @@ st.set_page_config(page_title="TeleOps Observability", layout="wide")
 inject_theme()
 
 nav_links([
-    ("Dashboard", "/", False),
-    ("LLM Trace", "/LLM_Response", False),
-    ("Observability", "/Observability", True),
+    ("Incident Generator", "/1_Incident_Generator", False),
+    ("LLM Trace", "/3_LLM_Trace", False),
+    ("Observability", "/2_Observability", True),
 ], position="end")
 
 st.write("")
