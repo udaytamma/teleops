@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 from datetime import datetime, timezone
 from pathlib import Path
 import json
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Header
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from teleops.config import settings
+from teleops.config import settings, logger
 from teleops.data_gen.generator import ScenarioConfig, generate_scenario
 from teleops.db import SessionLocal
 from teleops.incident_corr.correlator import correlate_alerts
@@ -18,7 +19,56 @@ from teleops.llm.rca import baseline_rca, llm_rca
 from teleops.models import Alert, Incident, RCAArtifact
 from teleops.rag.index import get_rag_context
 
-app = FastAPI(title="TeleOps API")
+
+# Pydantic models for request validation
+class GenerateRequest(BaseModel):
+    """Request payload for generating synthetic alerts and incidents."""
+
+    incident_type: Literal[
+        "network_degradation",
+        "dns_outage",
+        "bgp_flap",
+        "fiber_cut",
+        "router_freeze",
+        "isp_peering_congestion",
+        "ddos_edge",
+        "mpls_vpn_leak",
+        "cdn_cache_stampede",
+        "firewall_rule_misconfig",
+        "database_latency_spike",
+    ] = Field(default="network_degradation", description="Type of incident scenario to generate")
+    alert_rate_per_min: int = Field(default=20, ge=1, le=100, description="Alerts per minute to generate")
+    duration_min: int = Field(default=10, ge=1, le=60, description="Duration of scenario in minutes")
+    noise_rate_per_min: int = Field(default=5, ge=0, le=50, description="Noise alerts per minute")
+    seed: int | None = Field(default=42, description="Random seed for reproducibility")
+
+
+class ServiceNowWebhookPayload(BaseModel):
+    """ServiceNow webhook payload structure."""
+
+    sys_id: str = Field(..., description="ServiceNow record sys_id")
+    number: str = Field(..., description="Incident number (e.g., INC0012345)")
+    short_description: str = Field(..., description="Brief incident description")
+    priority: int = Field(default=3, ge=1, le=5, description="Priority 1-5 (1=Critical)")
+    state: str = Field(default="New", description="Incident state")
+
+
+class JiraWebhookPayload(BaseModel):
+    """Jira webhook payload structure."""
+
+    issue_key: str = Field(..., description="Jira issue key (e.g., OPS-123)")
+    summary: str = Field(..., description="Issue summary")
+    priority: str = Field(default="Medium", description="Issue priority")
+    status: str = Field(default="Open", description="Issue status")
+
+
+app = FastAPI(
+    title="TeleOps API",
+    description="AI-powered root cause analysis platform for MSP/Telco network operations",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
 
 
 def get_db():
@@ -104,13 +154,15 @@ def require_api_token(authorization: str | None = Header(default=None), x_api_ke
 
 
 @app.post("/generate")
-def generate_alerts(payload: dict[str, Any], db: Session = Depends(get_db), _: None = Depends(require_api_token)):
+def generate_alerts(payload: GenerateRequest, db: Session = Depends(get_db), _: None = Depends(require_api_token)):
+    logger.info(f"Generating scenario: type={payload.incident_type}, duration={payload.duration_min}min")
+
     config = ScenarioConfig(
-        incident_type=payload.get("incident_type", "network_degradation"),
-        alert_rate_per_min=payload.get("alert_rate_per_min", 20),
-        duration_min=payload.get("duration_min", 10),
-        noise_rate_per_min=payload.get("noise_rate_per_min", 5),
-        seed=payload.get("seed", 42),
+        incident_type=payload.incident_type,
+        alert_rate_per_min=payload.alert_rate_per_min,
+        duration_min=payload.duration_min,
+        noise_rate_per_min=payload.noise_rate_per_min,
+        seed=payload.seed,
     )
     alerts, ground_truth = generate_scenario(config)
 
@@ -134,6 +186,8 @@ def generate_alerts(payload: dict[str, Any], db: Session = Depends(get_db), _: N
 
     alert_ids = [model.id for model in alert_models]
     incidents = correlate_alerts(db, alert_ids=alert_ids)
+
+    logger.info(f"Generated {len(alert_models)} alerts, {len(incidents)} incidents")
 
     return {
         "alerts_inserted": len(alert_models),
@@ -167,6 +221,7 @@ def list_incident_alerts(incident_id: str, db: Session = Depends(get_db)):
 
 @app.post("/reset")
 def reset_data(db: Session = Depends(get_db), _: None = Depends(require_api_token)):
+    logger.info("Resetting all data")
     db.query(RCAArtifact).delete()
     db.query(Incident).delete()
     db.query(Alert).delete()
@@ -180,7 +235,13 @@ def generate_baseline_rca(incident_id: str, db: Session = Depends(get_db), _: No
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
 
-    result = baseline_rca(incident.summary)
+    logger.info(f"Generating baseline RCA for incident {incident_id}")
+
+    # Fetch alerts for pattern matching
+    alerts = db.query(Alert).filter(Alert.id.in_(incident.related_alert_ids or [])).all()
+    alerts_dicts = [alert_to_dict(alert) for alert in alerts]
+
+    result = baseline_rca(incident.summary, alerts_dicts)
     artifact = RCAArtifact(
         incident_id=incident.id,
         hypotheses=result["hypotheses"],
@@ -191,6 +252,7 @@ def generate_baseline_rca(incident_id: str, db: Session = Depends(get_db), _: No
     db.add(artifact)
     db.commit()
 
+    logger.info(f"Baseline RCA complete: hypothesis={result['hypotheses'][0][:50]}...")
     return result
 
 
@@ -199,6 +261,8 @@ def generate_llm_rca(incident_id: str, db: Session = Depends(get_db), _: None = 
     incident = db.query(Incident).filter(Incident.id == incident_id).first()
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
+
+    logger.info(f"Generating LLM RCA for incident {incident_id}")
 
     alerts = db.query(Alert).filter(Alert.id.in_(incident.related_alert_ids)).all()
     incident_dict = incident_to_dict(incident)
@@ -214,7 +278,9 @@ def generate_llm_rca(incident_id: str, db: Session = Depends(get_db), _: None = 
         }
         result = llm_rca(incident_dict, alerts_dicts, rag_context)
     except Exception as exc:
+        logger.error(f"LLM/RAG error for incident {incident_id}: {exc}")
         raise HTTPException(status_code=502, detail=f"LLM/RAG error: {exc}") from exc
+
     artifact = RCAArtifact(
         incident_id=incident.id,
         hypotheses=result.get("hypotheses", []),
@@ -229,6 +295,7 @@ def generate_llm_rca(incident_id: str, db: Session = Depends(get_db), _: None = 
     db.add(artifact)
     db.commit()
 
+    logger.info(f"LLM RCA complete for incident {incident_id}")
     return result
 
 
@@ -269,14 +336,16 @@ def get_jira_issues():
 
 
 @app.post("/integrations/servicenow/webhook")
-def ingest_servicenow_webhook(payload: dict[str, Any], _: None = Depends(require_api_token)):
-    _append_integration_event("servicenow", payload)
+def ingest_servicenow_webhook(payload: ServiceNowWebhookPayload, _: None = Depends(require_api_token)):
+    logger.info(f"ServiceNow webhook received: {payload.number}")
+    _append_integration_event("servicenow", payload.model_dump())
     return {"status": "received", "source": "servicenow"}
 
 
 @app.post("/integrations/jira/webhook")
-def ingest_jira_webhook(payload: dict[str, Any], _: None = Depends(require_api_token)):
-    _append_integration_event("jira", payload)
+def ingest_jira_webhook(payload: JiraWebhookPayload, _: None = Depends(require_api_token)):
+    logger.info(f"Jira webhook received: {payload.issue_key}")
+    _append_integration_event("jira", payload.model_dump())
     return {"status": "received", "source": "jira"}
 
 
@@ -305,3 +374,9 @@ def get_metrics_overview(db: Session = Depends(get_db), _: None = Depends(requir
         "test_results": _load_metrics_file(settings.test_results_path),
         "evaluation_results": _load_metrics_file(settings.evaluation_results_path),
     }
+
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint for monitoring."""
+    return {"status": "healthy", "app": settings.app_name, "environment": settings.environment}

@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-from teleops.config import settings
+from teleops.config import settings, logger
 
 
 class LLMClientError(RuntimeError):
@@ -58,13 +58,19 @@ class OpenAICompatibleClient(BaseLLMClient):
             "temperature": 0.2,
         }
         url = f"{self.base_url}/chat/completions"
-        with httpx.Client(timeout=60.0) as client:
+        timeout = settings.llm_timeout_seconds
+        logger.info(f"LLM request to {url} with model={self.model}, timeout={timeout}s")
+
+        with httpx.Client(timeout=timeout) as client:
             response = client.post(url, headers=headers, json=payload)
+
         if response.status_code >= 400:
+            logger.error(f"LLM request failed: {response.status_code} {response.text[:200]}")
             raise LLMClientError(f"LLM request failed: {response.status_code} {response.text}")
 
         data = response.json()
         content = data["choices"][0]["message"]["content"]
+        logger.info(f"LLM response received, parsing JSON ({len(content)} chars)")
         return _parse_json_response(content)
 
 
@@ -79,9 +85,16 @@ class GeminiClient(BaseLLMClient):
         except ImportError as exc:
             raise LLMClientError("Gemini SDK not installed") from exc
 
+        logger.info(f"Gemini request with model={self.model}, timeout={settings.gemini_timeout_seconds}s")
         genai.configure(api_key=self.api_key)
         model = genai.GenerativeModel(self.model)
-        response = model.generate_content(prompt)
+
+        # Configure timeout via generation config
+        generation_config = genai.GenerationConfig(
+            temperature=0.2,
+        )
+        response = model.generate_content(prompt, generation_config=generation_config)
+        logger.info(f"Gemini response received, parsing JSON ({len(response.text)} chars)")
         return _parse_json_response(response.text)
 
 

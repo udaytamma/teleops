@@ -2,18 +2,129 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Any
 
 from teleops.llm.client import get_llm_client
 
 
-def baseline_rca(incident_summary: str) -> dict[str, Any]:
+# Pattern-matching rules for baseline RCA
+# Maps keywords in incident summary/alerts to hypotheses
+BASELINE_RULES: list[dict[str, Any]] = [
+    {
+        "patterns": ["dns", "servfail", "nx_domain", "resolver"],
+        "hypothesis": "authoritative DNS cluster outage in region-east",
+        "confidence": 0.60,
+        "evidence": "DNS-related alerts: servfail spikes, NXDOMAIN increases, resolver timeouts",
+    },
+    {
+        "patterns": ["bgp", "route_withdrawal", "session_flap", "as65", "peering"],
+        "hypothesis": "unstable BGP session with upstream AS causing route flaps",
+        "confidence": 0.58,
+        "evidence": "BGP session state changes, route withdrawals, prefix instability",
+    },
+    {
+        "patterns": ["fiber", "optical", "dwdm", "loss_of_signal", "link_down"],
+        "hypothesis": "fiber cut on metro ring segment causing optical link failure",
+        "confidence": 0.65,
+        "evidence": "Optical NMS alerts: loss of signal, link down events on transport layer",
+    },
+    {
+        "patterns": ["control_plane", "cpu_spike", "freeze", "hang", "router"],
+        "hypothesis": "control plane freeze on core router causing forwarding issues",
+        "confidence": 0.55,
+        "evidence": "Router CPU spikes, control plane unresponsive, routing updates stalled",
+    },
+    {
+        "patterns": ["ddos", "syn_flood", "traffic_spike", "scrubbing", "volumetric"],
+        "hypothesis": "volumetric DDoS attack targeting edge infrastructure",
+        "confidence": 0.70,
+        "evidence": "Security monitor alerts: traffic spike, SYN flood indicators, scrubbing triggered",
+    },
+    {
+        "patterns": ["mpls", "vpn", "vrf", "route_leak", "l3vpn"],
+        "hypothesis": "VRF misconfiguration causing MPLS/L3VPN route leak",
+        "confidence": 0.52,
+        "evidence": "MPLS alerts: route leak detected, VRF mismatch, unexpected prefix propagation",
+    },
+    {
+        "patterns": ["cdn", "cache", "stampede", "origin", "ttl"],
+        "hypothesis": "CDN cache stampede due to TTL misconfiguration",
+        "confidence": 0.58,
+        "evidence": "CDN alerts: cache miss spike, origin latency increase, TTL-related errors",
+    },
+    {
+        "patterns": ["firewall", "blocked", "policy_violation", "rule"],
+        "hypothesis": "firewall rule misconfiguration blocking critical traffic",
+        "confidence": 0.62,
+        "evidence": "Firewall alerts: blocked port events, policy violation logs",
+    },
+    {
+        "patterns": ["database", "db", "query_latency", "lock_waits", "contention"],
+        "hypothesis": "database contention causing latency spike on hosted applications",
+        "confidence": 0.55,
+        "evidence": "Database alerts: query latency spikes, lock waits, connection pool exhaustion",
+    },
+    {
+        "patterns": ["peering", "congestion", "isp", "as64"],
+        "hypothesis": "congestion on ISP peering link causing packet loss",
+        "confidence": 0.57,
+        "evidence": "Peering alerts: high latency, packet loss on ISP interconnect",
+    },
+    # Default fallback for network_degradation
+    {
+        "patterns": ["packet_loss", "latency", "degradation", "network"],
+        "hypothesis": "link congestion on core-router-1 causing packet loss",
+        "confidence": 0.55,
+        "evidence": "Network alerts: packet_loss/high_latency burst on core-router-1",
+    },
+]
+
+
+def baseline_rca(incident_summary: str, alerts: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Generate baseline RCA using pattern-matching rules.
+
+    Analyzes incident summary and alert data to select the most appropriate
+    hypothesis from predefined rules. Falls back to network degradation if
+    no patterns match.
+
+    Args:
+        incident_summary: Text summary of the incident
+        alerts: Optional list of alert dictionaries for additional context
+
+    Returns:
+        RCA result with hypotheses, confidence scores, and evidence
+    """
+    # Build search text from incident summary and alerts
+    search_text = incident_summary.lower()
+    if alerts:
+        for alert in alerts[:20]:  # Check first 20 alerts
+            search_text += f" {alert.get('alert_type', '')} {alert.get('message', '')}".lower()
+
+    # Find matching rule
+    matched_rule = None
+    match_count = 0
+
+    for rule in BASELINE_RULES:
+        current_matches = sum(1 for pattern in rule["patterns"] if pattern in search_text)
+        if current_matches > match_count:
+            match_count = current_matches
+            matched_rule = rule
+
+    # Use matched rule or default to last rule (network_degradation)
+    if matched_rule is None:
+        matched_rule = BASELINE_RULES[-1]
+
+    hypothesis = matched_rule["hypothesis"]
+    confidence = matched_rule["confidence"]
+    evidence = matched_rule["evidence"]
+
     return {
         "incident_summary": incident_summary,
-        "hypotheses": ["link congestion on core-router-1 causing packet loss"],
-        "confidence_scores": {"link congestion on core-router-1 causing packet loss": 0.55},
-        "evidence": {"alerts": "packet_loss/high_latency burst on core-router-1"},
+        "hypotheses": [hypothesis],
+        "confidence_scores": {hypothesis: confidence},
+        "evidence": {"alerts": evidence, "match_count": match_count},
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "model": "baseline-rules",
     }
