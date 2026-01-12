@@ -5,6 +5,10 @@ from __future__ import annotations
 import statistics
 from difflib import SequenceMatcher
 
+import argparse
+import json
+from pathlib import Path
+
 from teleops.data_gen.generator import ScenarioConfig, generate_scenario
 from teleops.llm.rca import baseline_rca, llm_rca
 from teleops.rag.index import get_rag_context
@@ -52,5 +56,54 @@ def run_eval(num_runs: int = 50) -> dict:
     return results
 
 
+def load_manual_labels(path: Path) -> list[dict]:
+    labels: list[dict] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            labels.append(json.loads(line))
+    return labels
+
+
+def run_manual_label_eval(labels: list[dict]) -> dict:
+    scores = []
+    for label in labels:
+        summary = label.get("incident_summary", "")
+        root_cause = label.get("root_cause", "")
+        output = baseline_rca(summary)
+        scores.append(score_output(output, root_cause))
+
+    return {
+        "manual_label_cases": len(labels),
+        "manual_label_avg": statistics.mean(scores) if scores else 0.0,
+        "manual_label_median": statistics.median(scores) if scores else 0.0,
+    }
+
+
 if __name__ == "__main__":
-    print(run_eval())
+    parser = argparse.ArgumentParser(description="Run TeleOps evaluation.")
+    parser.add_argument("--runs", type=int, default=50, help="Number of synthetic runs.")
+    parser.add_argument(
+        "--labels-file",
+        default="docs/evaluation/manual_labels.jsonl",
+        help="Optional JSONL file for manual label evaluation.",
+    )
+    parser.add_argument(
+        "--write-json",
+        default="",
+        help="Optional path to write evaluation results as JSON.",
+    )
+    args = parser.parse_args()
+
+    results = run_eval(num_runs=args.runs)
+
+    labels_path = Path(args.labels_file)
+    if labels_path.exists():
+        labels = load_manual_labels(labels_path)
+        results.update(run_manual_label_eval(labels))
+
+    if args.write_json:
+        Path(args.write_json).write_text(json.dumps(results, indent=2), encoding="utf-8")
+    print(results)

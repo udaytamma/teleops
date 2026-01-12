@@ -36,6 +36,8 @@ Set these environment variables as needed:
 - `LLM_BASE_URL`: OpenAI-compatible base URL for Tele-LLM
 - `LLM_API_KEY`: API key for Tele-LLM if required
 - `GEMINI_API_KEY`: API key for Gemini provider
+- `API_TOKEN`: optional API token for write endpoints and metrics
+- `TELEOPS_API_TOKEN`: optional UI token for API calls
 
 You can copy `.env.example` to `.env` for a starting point.
 
@@ -56,6 +58,32 @@ Run the evaluation script:
 python scripts/evaluate.py
 ```
 
+You can also score against the manual labels set:
+
+```bash
+python scripts/evaluate.py --labels-file docs/evaluation/manual_labels.jsonl
+```
+
+To write evaluation results for the dashboard:
+
+```bash
+python scripts/evaluate.py --write-json storage/evaluation_results.json
+```
+
+## Data Import
+Load anonymized sample alerts into the database:
+
+```bash
+python scripts/import_logs.py --file docs/data_samples/anonymized_alerts.jsonl
+```
+
+## Tests
+Run tests with coverage and dashboard artifacts:
+
+```bash
+python scripts/run_tests.py
+```
+
 ## Preflight Checks
 Run a quick sanity check for RAG, LLM config, API, and UI:
 
@@ -72,3 +100,15 @@ teleops/
   tests/
   scripts/
 ```
+
+## Docs
+- `docs/integrations/README.md`
+- `docs/data_dictionary.md`
+- `docs/test_plan.md`
+- `docs/scenario_catalog.md`
+- `docs/demo_results.md`
+- `docs/demo_script.md`
+- `docs/evaluation/labeling_rubric.md`
+- `docs/threat_model.md`
+- `docs/redaction_policy.md`
+- `docs/deployment_runbook.md`

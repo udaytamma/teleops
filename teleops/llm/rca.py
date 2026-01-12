@@ -45,10 +45,16 @@ def build_prompt(incident: dict[str, Any], alerts: list[dict[str, Any]], rag_con
     return json_dumps(prompt)
 
 
+def _json_default(value: Any) -> str:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return str(value)
+
+
 def json_dumps(payload: dict[str, Any]) -> str:
     import json
 
-    return json.dumps(payload, indent=2)
+    return json.dumps(payload, indent=2, default=_json_default)
 
 
 def llm_rca(incident: dict[str, Any], alerts: list[dict[str, Any]], rag_context: list[str]) -> dict[str, Any]:

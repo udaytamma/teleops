@@ -1,0 +1,36 @@
+{
+  "records": [
+    {
+      "sys_id": "4b3f2d1a0a0a0b0c0d0e0f1011121314",
+      "number": "INC0012345",
+      "short_description": "Packet loss on core-router-1 impacting backbone traffic",
+      "description": "Synthetic incident payload for demo integration readiness.",
+      "category": "network",
+      "subcategory": "latency",
+      "priority": "2",
+      "impact": "2",
+      "urgency": "2",
+      "state": "In Progress",
+      "assignment_group": "NOC-Core",
+      "caller_id": "ops.engineer",
+      "opened_at": "2025-09-24T12:31:44Z",
+      "updated_at": "2025-09-24T12:48:10Z"
+    },
+    {
+      "sys_id": "9c8b7a6a5b4c3d2e1f0a0b0c0d0e0f10",
+      "number": "INC0012377",
+      "short_description": "Intermittent jitter on edge-router-3",
+      "description": "Synthetic incident payload for demo integration readiness.",
+      "category": "network",
+      "subcategory": "jitter",
+      "priority": "3",
+      "impact": "3",
+      "urgency": "3",
+      "state": "New",
+      "assignment_group": "NOC-Edge",
+      "caller_id": "auto.teleops",
+      "opened_at": "2025-09-24T13:05:02Z",
+      "updated_at": "2025-09-24T13:05:02Z"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "issues": [
+    {
+      "id": "10001",
+      "key": "NETOPS-17",
+      "fields": {
+        "summary": "Core router packet loss during peak hours",
+        "description": "Synthetic issue used to simulate a Jira integration.",
+        "issuetype": { "name": "Incident" },
+        "priority": { "name": "High" },
+        "status": { "name": "In Progress" },
+        "created": "2025-09-24T12:40:18Z",
+        "updated": "2025-09-24T12:50:43Z",
+        "assignee": { "displayName": "Ops Engineer" },
+        "labels": ["teleops", "synthetic", "network"]
+      }
+    },
+    {
+      "id": "10002",
+      "key": "NETOPS-21",
+      "fields": {
+        "summary": "Edge router jitter spikes in region-east",
+        "description": "Synthetic issue used to simulate a Jira integration.",
+        "issuetype": { "name": "Incident" },
+        "priority": { "name": "Medium" },
+        "status": { "name": "To Do" },
+        "created": "2025-09-24T13:10:01Z",
+        "updated": "2025-09-24T13:10:01Z",
+        "assignee": { "displayName": "NOC Analyst" },
+        "labels": ["teleops", "synthetic", "edge"]
+      }
+    }
+  ]
+}

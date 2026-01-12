@@ -29,6 +29,17 @@ class Settings(BaseSettings):
     rag_index_dir: str = "./storage/rag_index"
     rag_top_k: int = 4
 
+    # Integrations
+    integrations_fixtures_dir: str = "./docs/integrations/fixtures"
+    integrations_log_path: str = "./storage/integration_events.jsonl"
+
+    # Metrics artifacts
+    test_results_path: str = "./storage/test_results.json"
+    evaluation_results_path: str = "./storage/evaluation_results.json"
+
+    # Access control (optional)
+    api_token: str | None = None
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

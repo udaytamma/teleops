@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from typing import Any
+from datetime import datetime, timezone
+from pathlib import Path
+import json
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Header
 from sqlalchemy.orm import Session
 
+from teleops.config import settings
 from teleops.data_gen.generator import ScenarioConfig, generate_scenario
 from teleops.db import SessionLocal
 from teleops.incident_corr.correlator import correlate_alerts
@@ -58,8 +62,49 @@ def incident_to_dict(incident: Incident) -> dict[str, Any]:
     }
 
 
+def _load_fixture(name: str) -> dict[str, Any]:
+    fixture_dir = Path(settings.integrations_fixtures_dir)
+    path = fixture_dir / name
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Fixture not found")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _append_integration_event(source: str, payload: dict[str, Any]) -> None:
+    log_path = Path(settings.integrations_log_path)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    event = {
+        "received_at": datetime.now(timezone.utc).isoformat(),
+        "source": source,
+        "payload": payload,
+    }
+    with log_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(event) + "\n")
+
+
+def _load_metrics_file(path_str: str) -> dict[str, Any] | None:
+    path = Path(path_str)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+
+def require_api_token(authorization: str | None = Header(default=None), x_api_key: str | None = Header(default=None)):
+    if not settings.api_token:
+        return
+    token = x_api_key
+    if not token and authorization:
+        if authorization.lower().startswith("bearer "):
+            token = authorization.split(" ", 1)[1].strip()
+    if token != settings.api_token:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
 @app.post("/generate")
-def generate_alerts(payload: dict[str, Any], db: Session = Depends(get_db)):
+def generate_alerts(payload: dict[str, Any], db: Session = Depends(get_db), _: None = Depends(require_api_token)):
     config = ScenarioConfig(
         incident_type=payload.get("incident_type", "network_degradation"),
         alert_rate_per_min=payload.get("alert_rate_per_min", 20),
@@ -109,8 +154,19 @@ def list_incidents(db: Session = Depends(get_db)):
     return [incident_to_dict(incident) for incident in incidents]
 
 
+@app.get("/incidents/{incident_id}/alerts")
+def list_incident_alerts(incident_id: str, db: Session = Depends(get_db)):
+    incident = db.query(Incident).filter(Incident.id == incident_id).first()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    if not incident.related_alert_ids:
+        return []
+    alerts = db.query(Alert).filter(Alert.id.in_(incident.related_alert_ids)).all()
+    return [alert_to_dict(alert) for alert in alerts]
+
+
 @app.post("/reset")
-def reset_data(db: Session = Depends(get_db)):
+def reset_data(db: Session = Depends(get_db), _: None = Depends(require_api_token)):
     db.query(RCAArtifact).delete()
     db.query(Incident).delete()
     db.query(Alert).delete()
@@ -119,7 +175,7 @@ def reset_data(db: Session = Depends(get_db)):
 
 
 @app.post("/rca/{incident_id}/baseline")
-def generate_baseline_rca(incident_id: str, db: Session = Depends(get_db)):
+def generate_baseline_rca(incident_id: str, db: Session = Depends(get_db), _: None = Depends(require_api_token)):
     incident = db.query(Incident).filter(Incident.id == incident_id).first()
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
@@ -139,7 +195,7 @@ def generate_baseline_rca(incident_id: str, db: Session = Depends(get_db)):
 
 
 @app.post("/rca/{incident_id}/llm")
-def generate_llm_rca(incident_id: str, db: Session = Depends(get_db)):
+def generate_llm_rca(incident_id: str, db: Session = Depends(get_db), _: None = Depends(require_api_token)):
     incident = db.query(Incident).filter(Incident.id == incident_id).first()
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
@@ -199,4 +255,53 @@ def get_latest_rca(
         "evidence": artifact.evidence,
         "llm_model": artifact.llm_model,
         "timestamp": artifact.timestamp.isoformat(),
+    }
+
+
+@app.get("/integrations/servicenow/incidents")
+def get_servicenow_incidents():
+    return _load_fixture("servicenow_incidents.json")
+
+
+@app.get("/integrations/jira/issues")
+def get_jira_issues():
+    return _load_fixture("jira_issues.json")
+
+
+@app.post("/integrations/servicenow/webhook")
+def ingest_servicenow_webhook(payload: dict[str, Any], _: None = Depends(require_api_token)):
+    _append_integration_event("servicenow", payload)
+    return {"status": "received", "source": "servicenow"}
+
+
+@app.post("/integrations/jira/webhook")
+def ingest_jira_webhook(payload: dict[str, Any], _: None = Depends(require_api_token)):
+    _append_integration_event("jira", payload)
+    return {"status": "received", "source": "jira"}
+
+
+@app.get("/metrics/overview")
+def get_metrics_overview(db: Session = Depends(get_db), _: None = Depends(require_api_token)):
+    alert_count = db.query(Alert).count()
+    incident_count = db.query(Incident).count()
+    rca_count = db.query(RCAArtifact).count()
+
+    incidents = db.query(Incident).all()
+    avg_alerts = (
+        sum(len(item.related_alert_ids or []) for item in incidents) / len(incidents)
+        if incidents
+        else 0.0
+    )
+
+    return {
+        "counts": {
+            "alerts": alert_count,
+            "incidents": incident_count,
+            "rca_artifacts": rca_count,
+        },
+        "kpis": {
+            "avg_alerts_per_incident": round(avg_alerts, 2),
+        },
+        "test_results": _load_metrics_file(settings.test_results_path),
+        "evaluation_results": _load_metrics_file(settings.evaluation_results_path),
     }

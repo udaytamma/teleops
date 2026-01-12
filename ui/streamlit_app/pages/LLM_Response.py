@@ -6,6 +6,8 @@ import requests
 import streamlit as st
 
 API_URL = os.getenv("TELEOPS_API_URL", "http://localhost:8000")
+API_TOKEN = os.getenv("TELEOPS_API_TOKEN", "")
+REQUEST_HEADERS = {"X-API-Key": API_TOKEN} if API_TOKEN else {}
 
 st.set_page_config(page_title="LLM Response Viewer", layout="wide")
 
@@ -79,7 +81,7 @@ st.markdown(
 
 st.write("")
 
-incidents_resp = requests.get(f"{API_URL}/incidents", timeout=30)
+incidents_resp = requests.get(f"{API_URL}/incidents", headers=REQUEST_HEADERS, timeout=30)
 if incidents_resp.status_code >= 400:
     st.error(incidents_resp.text)
     st.stop()
@@ -94,18 +96,24 @@ selected = st.selectbox("Select incident", options=incidents, format_func=lambda
 artifact_resp = requests.get(
     f"{API_URL}/rca/{selected['id']}/latest",
     params={"source": "llm"},
+    headers=REQUEST_HEADERS,
     timeout=30,
 )
 if artifact_resp.status_code == 404:
     st.warning("No LLM RCA found for this incident. Run LLM RCA to generate a response.")
     if st.button("Run LLM RCA", type="primary"):
-        run_resp = requests.post(f"{API_URL}/rca/{selected['id']}/llm", timeout=60)
+        run_resp = requests.post(
+            f"{API_URL}/rca/{selected['id']}/llm",
+            headers=REQUEST_HEADERS,
+            timeout=60,
+        )
         if run_resp.status_code >= 400:
             st.error(run_resp.text)
             st.stop()
         artifact_resp = requests.get(
             f"{API_URL}/rca/{selected['id']}/latest",
             params={"source": "llm"},
+            headers=REQUEST_HEADERS,
             timeout=30,
         )
         if artifact_resp.status_code >= 400:

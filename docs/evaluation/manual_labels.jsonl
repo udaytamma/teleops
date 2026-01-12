@@ -1,0 +1,20 @@
+{"case_id":"L-001","incident_summary":"Packet loss observed on core-router-1 during peak hours","root_cause":"link congestion on core-router-1 causing packet loss","severity":"critical"}
+{"case_id":"L-002","incident_summary":"Edge router jitter spikes impacting VoIP","root_cause":"queue saturation on edge-router-3 causing jitter","severity":"high"}
+{"case_id":"L-003","incident_summary":"Aggregation switch latency above SLA across multiple VLANs","root_cause":"uplink congestion on agg-switch-2","severity":"critical"}
+{"case_id":"L-004","incident_summary":"Backbone latency and packet loss after routing change","root_cause":"misconfigured routing policy on core-router-1","severity":"critical"}
+{"case_id":"L-005","incident_summary":"Intermittent drops on backbone interface xe-0/0/1","root_cause":"interface errors on core-router-1 xe-0/0/1","severity":"high"}
+{"case_id":"L-006","incident_summary":"Edge router high latency with stable packet loss","root_cause":"traffic shaping misconfiguration on edge-router-3","severity":"medium"}
+{"case_id":"L-007","incident_summary":"Packet loss across aggregation layer during backup window","root_cause":"backup traffic congesting agg-switch-2 uplink","severity":"high"}
+{"case_id":"L-008","incident_summary":"Core router CPU spike followed by latency","root_cause":"control plane overload on core-router-1","severity":"high"}
+{"case_id":"L-009","incident_summary":"Latency spike confined to region-east edge routers","root_cause":"regional peering congestion impacting edge-router-3","severity":"medium"}
+{"case_id":"L-010","incident_summary":"Packet loss and jitter after QoS policy update","root_cause":"incorrect QoS class mapping on core-router-1","severity":"critical"}
+{"case_id":"L-011","incident_summary":"Aggregation switch packet loss during link failover","root_cause":"LACP mismatch on agg-switch-2 uplink","severity":"high"}
+{"case_id":"L-012","incident_summary":"Backbone latency increase with stable utilization","root_cause":"microburst traffic on core-router-1","severity":"medium"}
+{"case_id":"L-013","incident_summary":"Packet loss on edge router during maintenance window","root_cause":"maintenance-induced interface flap on edge-router-3","severity":"medium"}
+{"case_id":"L-014","incident_summary":"Core router packet drops on specific interface","root_cause":"hardware errors on core-router-1 interface xe-0/0/1","severity":"high"}
+{"case_id":"L-015","incident_summary":"Aggregation latency following spanning tree reconvergence","root_cause":"STP reconvergence on agg-switch-2","severity":"medium"}
+{"case_id":"L-016","incident_summary":"Edge router latency spikes during DDoS mitigation","root_cause":"scrubbing center reroute impacting edge-router-3","severity":"high"}
+{"case_id":"L-017","incident_summary":"Core router packet loss after firmware upgrade","root_cause":"post-upgrade interface instability on core-router-1","severity":"critical"}
+{"case_id":"L-018","incident_summary":"Aggregation switch packet loss on multiple ports","root_cause":"oversubscribed agg-switch-2 uplink","severity":"high"}
+{"case_id":"L-019","incident_summary":"Backbone latency degradation with BGP churn","root_cause":"BGP route flapping on core-router-1","severity":"high"}
+{"case_id":"L-020","incident_summary":"Edge router jitter spikes on video traffic","root_cause":"queue starvation on edge-router-3 for real-time traffic","severity":"medium"}
