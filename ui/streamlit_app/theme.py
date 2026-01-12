@@ -725,16 +725,26 @@ def badge(text: str, variant: str = "accent") -> str:
 
 
 def nav_links(links: list[tuple[str, str, bool]], position: str = "right") -> None:
-    """Render navigation links. Each tuple is (label, url, is_active)."""
+    """Render navigation links using Streamlit's native page_link.
+
+    Each tuple is (label, page_path, is_active) where page_path is
+    the relative path to the .py file, e.g. 'pages/2_Observability.py'.
+    """
     import streamlit as st
-    links_html = "".join(
-        f'<a href="{url}" class="{"active" if active else ""}">{label}</a>'
-        for label, url, active in links
-    )
-    st.markdown(
-        f'<div class="teleops-nav" style="justify-content: flex-{position};">{links_html}</div>',
-        unsafe_allow_html=True,
-    )
+
+    # Use columns for horizontal layout
+    cols = st.columns([1] * len(links) + [3] if position == "start" else [3] + [1] * len(links))
+    start_idx = 0 if position == "start" else 1
+
+    for i, (label, page_path, is_active) in enumerate(links):
+        with cols[start_idx + i]:
+            if is_active:
+                st.markdown(
+                    f'<span style="color: var(--accent); font-weight: 600; font-size: 14px;">{label}</span>',
+                    unsafe_allow_html=True
+                )
+            else:
+                st.page_link(page_path, label=label)
 
 
 def metric_card(value: str | int | float, label: str, color: str = "accent") -> str:

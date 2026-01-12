@@ -6,7 +6,7 @@ import streamlit as st
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from theme import inject_theme, hero, card_start, card_end, card_header, divider, nav_links, badge, empty_state
+from theme import inject_theme, hero, divider, nav_links, badge, empty_state
 
 API_URL = os.getenv("TELEOPS_API_URL", "http://localhost:8000")
 API_TOKEN = os.getenv("TELEOPS_API_TOKEN", "")
@@ -16,9 +16,9 @@ st.set_page_config(page_title="LLM Response Viewer", layout="wide")
 inject_theme()
 
 nav_links([
-    ("Incident Generator", "/1_Incident_Generator", False),
-    ("LLM Trace", "/3_LLM_Trace", True),
-    ("Observability", "/2_Observability", False),
+    ("Incident Generator", "pages/1_Incident_Generator.py", False),
+    ("LLM Trace", "pages/3_LLM_Trace.py", True),
+    ("Observability", "pages/2_Observability.py", False),
 ], position="end")
 
 st.write("")
@@ -41,7 +41,7 @@ if not incidents:
     empty_state("No incidents available. Generate a scenario first.", "")
     st.stop()
 
-selected = st.selectbox("Select Incident", options=incidents, format_func=lambda i: f"{i['id'][:12]}... - {i.get('summary', 'No summary')[:40]}")
+selected = st.selectbox("Select Incident", options=incidents, format_func=lambda i: f"{i['id']} - {i.get('summary', 'No summary')[:40]}")
 
 artifact_resp = requests.get(
     f"{API_URL}/rca/{selected['id']}/latest",
@@ -72,8 +72,15 @@ llm_response = evidence.get("llm_response", {})
 left, right = st.columns(2, gap="large")
 
 with left:
-    card_start()
-    card_header("LLM Request", "Incident context, alerts, and RAG chunks sent to model")
+    st.markdown(
+        """
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <h4 style="margin: 0; font-size: 16px; font-weight: 600; color: var(--ink-strong);">LLM Request</h4>
+            <span style="font-size: 12px; color: var(--ink-dim);">Input sent to model</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     st.markdown("**Incident Context**")
     st.json(llm_request.get("incident", {}))
@@ -100,17 +107,23 @@ with left:
     else:
         st.markdown("<p style='color: var(--ink-dim);'>No RAG context</p>", unsafe_allow_html=True)
 
-    card_end()
-
 with right:
-    card_start("accent")
-    card_header("LLM Response", "Structured JSON output from the model")
+    st.markdown(
+        """
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <h4 style="margin: 0; font-size: 16px; font-weight: 600; color: var(--ink-strong);">LLM Response</h4>
+                <span style="font-size: 12px; color: var(--ink-dim);">Structured output</span>
+            </div>
+            <span style="background: linear-gradient(135deg, #6C5CE7, #A29BFE); color: white; font-size: 10px; font-weight: 600; padding: 4px 10px; border-radius: 4px; letter-spacing: 0.05em;">AI-POWERED</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     if llm_response:
         st.markdown(f"{badge(artifact.get('model', 'unknown'), 'accent')} &nbsp; {badge(artifact.get('generated_at', '')[:19], 'muted')}", unsafe_allow_html=True)
         st.write("")
         st.json(llm_response)
     else:
-        empty_state("No response recorded", "")
-
-    card_end()
+        st.markdown("<p style='color: var(--ink-dim); text-align: center; padding: 20px;'>No response recorded</p>", unsafe_allow_html=True)

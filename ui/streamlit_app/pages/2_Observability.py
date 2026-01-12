@@ -6,7 +6,7 @@ import streamlit as st
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from theme import inject_theme, hero, card_start, card_end, card_header, divider, nav_links, metric_card, progress_bar, empty_state
+from theme import inject_theme, hero, nav_links, metric_card, progress_bar, empty_state
 
 API_URL = os.getenv("TELEOPS_API_URL", "http://localhost:8000")
 API_TOKEN = os.getenv("TELEOPS_API_TOKEN", "")
@@ -16,9 +16,9 @@ st.set_page_config(page_title="TeleOps Observability", layout="wide")
 inject_theme()
 
 nav_links([
-    ("Incident Generator", "/1_Incident_Generator", False),
-    ("LLM Trace", "/3_LLM_Trace", False),
-    ("Observability", "/2_Observability", True),
+    ("Incident Generator", "pages/1_Incident_Generator.py", False),
+    ("LLM Trace", "pages/3_LLM_Trace.py", False),
+    ("Observability", "pages/2_Observability.py", True),
 ], position="end")
 
 st.write("")
@@ -55,8 +55,15 @@ with cols[3]:
 st.write("")
 
 # Test Results
-card_start("accent")
-card_header("Test Results", "pytest coverage and pass rate")
+st.markdown(
+    """
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+        <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: var(--ink-strong);">Test Results</h3>
+        <span style="font-size: 13px; color: var(--ink-dim);">pytest coverage and pass rate</span>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 test_results = payload.get("test_results")
 if test_results:
@@ -78,13 +85,18 @@ if test_results:
 else:
     empty_state("No test results. Run: python scripts/run_tests.py", "")
 
-card_end()
-
 st.write("")
 
 # Evaluation Results
-card_start()
-card_header("Evaluation Results", "Baseline vs LLM accuracy comparison")
+st.markdown(
+    """
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+        <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: var(--ink-strong);">Evaluation Results</h3>
+        <span style="font-size: 13px; color: var(--ink-dim);">Baseline vs LLM accuracy comparison</span>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 evaluation_results = payload.get("evaluation_results")
 if evaluation_results:
@@ -92,5 +104,3 @@ if evaluation_results:
         st.json(evaluation_results)
 else:
     empty_state("No evaluation results. Run: python scripts/evaluate.py --write-json storage/evaluation_results.json", "")
-
-card_end()

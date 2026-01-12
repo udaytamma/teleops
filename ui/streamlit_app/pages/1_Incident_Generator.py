@@ -12,9 +12,6 @@ import streamlit as st
 from theme import (
     inject_theme,
     hero,
-    card_start,
-    card_end,
-    card_header,
     divider,
     severity_badge,
     badge,
@@ -44,17 +41,26 @@ SCENARIOS = {
 
 def render_rca_panel(title: str, payload: dict, is_llm: bool = False) -> None:
     """Render an RCA result panel with hypotheses, confidence, and evidence."""
-    panel_class = "teleops-rca-llm" if is_llm else "teleops-rca-baseline"
-    st.markdown(f'<div class="{panel_class}">', unsafe_allow_html=True)
-
-    st.markdown(f"### {title}")
-
     summary = payload.get("incident_summary", "N/A")
     model = payload.get("model", "unknown")
     generated_at = payload.get("generated_at", "")
     hypotheses = payload.get("hypotheses", [])
     confidence = payload.get("confidence_scores", {})
     evidence = payload.get("evidence", {})
+
+    # Panel header with title and badge
+    if is_llm:
+        st.markdown(
+            f"""
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <h4 style="margin: 0; font-size: 16px; font-weight: 600; color: var(--ink-strong);">{title}</h4>
+                <span style="background: linear-gradient(135deg, #6C5CE7, #A29BFE); color: white; font-size: 10px; font-weight: 600; padding: 4px 10px; border-radius: 4px; letter-spacing: 0.05em;">AI-POWERED</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(f"<h4 style='margin: 0 0 12px 0; font-size: 16px; font-weight: 600; color: var(--ink-strong);'>{title}</h4>", unsafe_allow_html=True)
 
     # Metadata badges
     st.markdown(
@@ -97,8 +103,6 @@ def render_rca_panel(title: str, payload: dict, is_llm: bool = False) -> None:
     else:
         st.markdown("<p style='color: var(--ink-dim);'>No evidence recorded.</p>", unsafe_allow_html=True)
 
-    st.markdown("</div>", unsafe_allow_html=True)
-
 
 # Page configuration
 st.set_page_config(
@@ -113,9 +117,9 @@ inject_theme()
 
 # Navigation
 nav_links([
-    ("Incident Generator", "/1_Incident_Generator", True),
-    ("LLM Trace", "/3_LLM_Trace", False),
-    ("Observability", "/2_Observability", False),
+    ("Incident Generator", "pages/1_Incident_Generator.py", True),
+    ("LLM Trace", "pages/3_LLM_Trace.py", False),
+    ("Observability", "pages/2_Observability.py", False),
 ], position="end")
 
 st.write("")
@@ -211,8 +215,15 @@ with st.sidebar:
                 st.json(resp.json())
 
 # Main content - Incident Queue
-card_start("accent")
-card_header("Incident Queue", "Active incidents from synthetic runs")
+st.markdown(
+    """
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+        <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: var(--ink-strong);">Incident Queue</h3>
+        <span style="font-size: 13px; color: var(--ink-dim);">Active incidents from synthetic runs</span>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # Fetch incidents
 incidents_resp = requests.get(f"{API_URL}/incidents", headers=REQUEST_HEADERS, timeout=30)
@@ -256,11 +267,19 @@ if incidents:
     severities = sorted({(item.get("severity") or "unknown") for item in incidents})
     statuses = sorted({(item.get("status") or "unknown") for item in incidents})
 
-    filter_cols = st.columns([1, 1, 2])
+    filter_cols = st.columns([1, 1, 2, 1])
     with filter_cols[0]:
-        severity_filter = st.multiselect("Severity", options=severities, default=severities, label_visibility="collapsed")
+        severity_filter = st.multiselect("Severity", options=severities, default=severities)
     with filter_cols[1]:
-        status_filter = st.multiselect("Status", options=statuses, default=statuses, label_visibility="collapsed")
+        status_filter = st.multiselect("Status", options=statuses, default=statuses)
+    with filter_cols[3]:
+        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+        if st.button("Clear All", help="Remove all incidents from the queue"):
+            resp = requests.post(f"{API_URL}/reset", headers=REQUEST_HEADERS, timeout=30)
+            if resp.status_code >= 400:
+                st.error(resp.text)
+            else:
+                st.rerun()
 
     filtered_incidents = [
         item for item in incidents
@@ -272,31 +291,20 @@ if incidents:
         divider()
 
         # Incident selector row
-        row = st.columns([1.5, 3, 1, 1.5])
+        row = st.columns([3, 2, 0.8, 1.2])
         with row[0]:
             selected = st.selectbox(
                 "Select Incident",
                 options=filtered_incidents,
-                format_func=lambda i: i["id"][:12] + "...",
+                format_func=lambda i: f"{i['id']} - {i.get('summary', 'No summary')[:30]}",
                 label_visibility="collapsed",
             )
         with row[1]:
-            st.markdown(f"<p style='margin: 8px 0; color: var(--ink);'>{selected.get('summary', 'No summary')}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p style='margin: 8px 0; color: var(--ink-muted); font-size: 13px;'>{selected.get('summary', '')[:50]}</p>", unsafe_allow_html=True)
         with row[2]:
             st.markdown(severity_badge(selected.get("severity")), unsafe_allow_html=True)
         with row[3]:
             run_rca = st.button("Run RCA", type="primary", use_container_width=True)
-
-        # Clear button
-        st.markdown('<div class="teleops-btn-secondary" style="margin-top: 12px;">', unsafe_allow_html=True)
-        if st.button("Clear All Incidents", use_container_width=True):
-            resp = requests.post(f"{API_URL}/reset", headers=REQUEST_HEADERS, timeout=30)
-            if resp.status_code >= 400:
-                st.error(resp.text)
-            else:
-                st.success("All incidents cleared")
-                st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
 
         if run_rca:
             with st.spinner("Running baseline RCA..."):
@@ -325,14 +333,19 @@ if incidents:
 else:
     empty_state("No incidents yet. Generate a scenario to begin.", "")
 
-card_end()
-
 st.write("")
 
-# Incident Context Card
+# Incident Context
 if incidents and filtered_incidents:
-    card_start()
-    card_header("Incident Context", "Metadata and alert sample for selected incident")
+    st.markdown(
+        """
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: var(--ink-strong);">Incident Context</h3>
+            <span style="font-size: 13px; color: var(--ink-dim);">Metadata and alert sample</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     context_cols = st.columns(4)
     with context_cols[0]:
@@ -374,30 +387,30 @@ if incidents and filtered_incidents:
         with st.expander(f"Alert sample (showing {len(alert_rows)} of {alert_count})"):
             st.dataframe(alert_rows, use_container_width=True, hide_index=True)
 
-    card_end()
-
 st.write("")
 
-# RCA Output Card
-card_start()
-card_header("RCA Comparison", "Baseline (rule-based) vs LLM (AI-powered) analysis")
-
+# RCA Output Section
 baseline_payload = st.session_state.get("baseline_rca")
 llm_payload = st.session_state.get("llm_rca")
 
-if not baseline_payload and not llm_payload:
-    empty_state("Select an incident and click 'Run RCA' to compare baseline and LLM results.", "")
-else:
+if baseline_payload or llm_payload:
+    st.markdown(
+        """
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: var(--ink-strong);">RCA Comparison</h3>
+            <span style="font-size: 13px; color: var(--ink-dim);">Baseline (rule-based) vs LLM (AI-powered)</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     left, right = st.columns(2, gap="large")
     with left:
         if baseline_payload:
             render_rca_panel("Baseline RCA", baseline_payload, is_llm=False)
         else:
-            empty_state("Baseline RCA not available", "")
+            st.markdown("<p style='color: var(--ink-dim); padding: 20px; text-align: center;'>Baseline RCA not available</p>", unsafe_allow_html=True)
     with right:
         if llm_payload:
             render_rca_panel("LLM RCA", llm_payload, is_llm=True)
         else:
-            empty_state("LLM RCA not available", "")
-
-card_end()
+            st.markdown("<p style='color: var(--ink-dim); padding: 20px; text-align: center;'>LLM RCA not available</p>", unsafe_allow_html=True)
