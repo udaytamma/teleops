@@ -1,65 +1,86 @@
-# TeleOps / MSPOps AI Platform (MVP)
+# TeleOps - AI-Powered Telecom Incident RCA Platform
 
-Minimal, end-to-end demo for MSP/telco incident RCA with synthetic data, RAG, and LLM-driven RCA.
+Intelligent root cause analysis for telecom/MSP network incidents using synthetic data, RAG pipelines, and LLM-driven diagnostics.
 
-## What It Does
-- Generate synthetic network degradation alerts (11 scenario types).
-- Correlate alerts into incidents using time-window rules.
-- Produce baseline RCA using pattern-matching rules (11 patterns).
-- Produce LLM RCA using RAG context from runbook corpus.
-- Simple Streamlit UI for incident review and RCA comparison.
-- OpenAPI documentation at `/docs` and `/redoc`.
+[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.109-009688.svg)](https://fastapi.tiangolo.com)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.32-ff4b4b.svg)](https://streamlit.io)
+[![LangGraph](https://img.shields.io/badge/LangGraph-Enabled-purple.svg)](https://langchain.com)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## Quick Start (Local)
+## Overview
 
-Recommended Python: 3.11 or 3.12. (Some dependencies do not yet ship wheels for 3.14.)
+TeleOps demonstrates AI-augmented incident management for telecom Network Operations Centers (NOC). It generates realistic network incidents, correlates alerts, and produces root cause analyses using both pattern-matching baselines and LLM-powered RAG pipelines.
+
+## Features
+
+### Incident Generation
+- **11 Scenario Types** - Network degradation, DNS outage, BGP flap, fiber cut, and more
+- **Realistic Alerts** - Time-correlated alert sequences with proper severity escalation
+- **Configurable Parameters** - Alert count, time windows, scenario weights
+
+### RCA Generation
+- **Baseline RCA** - Deterministic pattern-matching with 11 scenario-specific rules
+- **LLM RCA** - RAG-enhanced analysis using runbook corpus
+- **Side-by-Side Comparison** - Evaluate baseline vs. LLM quality
+
+### Observability
+- **Structured JSON Logging** - Production-ready log format
+- **OpenAPI Documentation** - Swagger UI and ReDoc
+- **Metrics Dashboard** - Incident statistics and RCA comparison
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| **API** | FastAPI with Pydantic validation |
+| **LLM** | Google Gemini 2.0 Flash |
+| **RAG** | LlamaIndex + HuggingFace embeddings |
+| **Dashboard** | Streamlit with NOC-style theme |
+| **Database** | SQLite (MVP) |
+
+## Quick Start
+
+### Prerequisites
+- Python 3.11 or 3.12 (recommended)
+- Google Gemini API key
+
+### Installation
 
 ```bash
+# Clone repository
+git clone https://github.com/udaytamma/teleops.git
+cd teleops
+
+# Create virtual environment
 python -m venv .venv
 source .venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your GEMINI_API_KEY
+
+# Initialize database
 python -m teleops.init_db
-uvicorn teleops.api.app:app --reload
+
+# Start API server
+uvicorn src.api.main:app --reload --port 8000
 ```
 
-In a second terminal:
+### Running the Dashboard
 
 ```bash
-streamlit run ui/streamlit_app/app.py
+# In a separate terminal
+streamlit run ui/streamlit_app/app.py --server.port 8501
 ```
 
-API docs available at http://127.0.0.1:8000/docs
-
-## Configuration
-Set these environment variables as needed:
-
-### Core Settings
-- `DATABASE_URL` (default: `sqlite:///./teleops.db`)
-- `LOG_LEVEL`: Logging level (default: `INFO`)
-- `LOG_FORMAT`: `json` or `text` (default: `json`)
-
-### LLM Provider
-- `LLM_PROVIDER`: `local_telellm` | `hosted_telellm` | `gemini`
-- `LLM_MODEL`: model name (e.g., `tele-llm-3b` or `gemini-1.5-flash`)
-- `LLM_BASE_URL`: OpenAI-compatible base URL for Tele-LLM
-- `LLM_API_KEY`: API key for Tele-LLM if required
-- `LLM_TIMEOUT_SECONDS`: Timeout for LLM requests (default: `60`)
-- `GEMINI_API_KEY`: API key for Gemini provider
-- `GEMINI_TIMEOUT_SECONDS`: Timeout for Gemini requests (default: `120`)
-
-### RAG Settings
-- `RAG_CORPUS_DIR`: Directory for runbook markdown files (default: `./docs/rag_corpus`)
-- `RAG_TOP_K`: Number of RAG nodes to retrieve (default: `4`)
-
-### Security
-- `API_TOKEN`: optional API token for write endpoints and metrics
-- `TELEOPS_API_TOKEN`: optional UI token for API calls
-
-You can copy `.env.example` to `.env` for a starting point.
+- **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Dashboard**: [http://localhost:8501](http://localhost:8501)
 
 ## Scenario Types
-
-The platform supports 11 incident scenario types:
 
 | Scenario | Description |
 |----------|-------------|
@@ -75,12 +96,61 @@ The platform supports 11 incident scenario types:
 | `firewall_rule_misconfig` | Firewall rules blocking critical traffic |
 | `database_latency_spike` | Database contention affecting MSP-hosted apps |
 
-## RAG Setup
-RAG uses LlamaIndex with HuggingFace embeddings (MiniLM) and a simple in-memory vector store. The corpus lives in `docs/rag_corpus/`.
+## API Reference
 
-Expected corpus structure:
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/generate` | Generate synthetic alerts and correlate incidents |
+| GET | `/incidents` | List all incidents |
+| POST | `/rca/{id}/baseline` | Generate pattern-matching RCA |
+| POST | `/rca/{id}/llm` | Generate LLM RCA with RAG context |
+| GET | `/metrics/overview` | Dashboard metrics |
+| POST | `/reset` | Clear all incidents |
+| GET | `/health` | Health check |
+
+## Project Structure
+
 ```
-docs/rag_corpus/
+teleops/
+├── src/
+│   ├── api/                      # FastAPI application
+│   │   └── main.py               # API routes
+│   ├── services/
+│   │   ├── rca.py                # RCA generation (baseline + LLM)
+│   │   ├── rag.py                # RAG pipeline
+│   │   └── scenario_generator.py # Synthetic incident generation
+│   ├── schemas/                  # Pydantic models
+│   └── config/                   # Settings management
+├── ui/
+│   └── streamlit_app/            # Dashboard
+│       ├── app.py                # Entry point
+│       ├── theme.py              # NOC-style theme
+│       └── pages/                # Multi-page app
+├── rag_corpus/                   # Runbook knowledge base
+├── storage/                      # Persistent data
+├── tests/                        # Test suite
+└── docs/                         # Additional documentation
+```
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `GEMINI_API_KEY` | Google Gemini API key | Required |
+| `LLM_PROVIDER` | `gemini` or `local_telellm` | `gemini` |
+| `LLM_TIMEOUT_SECONDS` | LLM request timeout | `60` |
+| `RAG_CORPUS_DIR` | Runbook directory | `./rag_corpus` |
+| `RAG_TOP_K` | Retrieved context chunks | `4` |
+| `LOG_FORMAT` | `json` or `text` | `json` |
+
+### RAG Corpus
+
+Place runbook markdown files in `rag_corpus/`:
+
+```
+rag_corpus/
 ├── backbone-troubleshooting.md
 ├── dns-operations.md
 ├── bgp-peering.md
@@ -90,102 +160,66 @@ docs/rag_corpus/
 └── cdn-caching.md
 ```
 
-You can swap to FAISS later for scale; this MVP keeps dependencies minimal for local setup.
-
-## API Endpoints
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| POST | `/generate` | Generate synthetic alerts and correlate incidents |
-| GET | `/alerts` | List all alerts |
-| GET | `/incidents` | List all incidents |
-| POST | `/rca/{id}/baseline` | Generate baseline RCA (pattern-matching) |
-| POST | `/rca/{id}/llm` | Generate LLM RCA with RAG context |
-| GET | `/health` | Health check for monitoring |
-| GET | `/docs` | OpenAPI documentation (Swagger) |
-| GET | `/redoc` | OpenAPI documentation (ReDoc) |
-
-All POST endpoints use Pydantic validation for request payloads.
-
-## Cloud Demo (GCP Cloud Run)
-- Build a container that runs `uvicorn teleops.api.app:app`.
-- Use a hosted LLM provider (Gemini) for Cloud Run since it is CPU-only.
-- Set `LLM_PROVIDER=gemini` and `GEMINI_API_KEY`.
-
-## Evaluation
-Run the evaluation script:
+## Testing
 
 ```bash
-python scripts/evaluate.py
-```
+# Run all tests
+pytest tests/ -v
 
-You can also score against the manual labels set:
-
-```bash
-python scripts/evaluate.py --labels-file docs/evaluation/manual_labels.jsonl
-```
-
-To write evaluation results for the dashboard:
-
-```bash
-python scripts/evaluate.py --write-json storage/evaluation_results.json
-```
-
-## Data Import
-Load anonymized sample alerts into the database:
-
-```bash
-python scripts/import_logs.py --file docs/data_samples/anonymized_alerts.jsonl
-```
-
-## Tests
-Run tests with coverage and dashboard artifacts:
-
-```bash
+# Run with coverage
 python scripts/run_tests.py
-```
 
-Test coverage includes:
-- API endpoints (generation, listing, RCA)
-- Pattern-matching baseline RCA
-- LLM client adapters and JSON parsing
-- Correlation logic
-- Integration webhooks (ServiceNow, Jira)
-
-## Preflight Checks
-Run a quick sanity check for RAG, LLM config, API, and UI:
-
-```bash
+# Preflight checks
 python scripts/preflight.py
 ```
 
-## Project Structure
-```
-teleops/
-  teleops/
-    api/app.py          # FastAPI REST API with Pydantic validation
-    config.py           # Pydantic settings + structured logging
-    llm/client.py       # LLM adapters (OpenAI-compatible, Gemini)
-    llm/rca.py          # Baseline + LLM RCA generation
-    data_gen/generator.py # 11 scenario type generators
-    incident_corr/correlator.py
-    rag/index.py        # LlamaIndex RAG
-    models.py           # SQLAlchemy ORM models
-  ui/
-  docs/
-  tests/
-  scripts/
+## Documentation
+
+- **Architecture**: [zeroleaf.dev/docs/telcoops/architecture](https://zeroleaf.dev/docs/telcoops/architecture)
+- **API Reference**: [zeroleaf.dev/docs/telcoops/api-reference](https://zeroleaf.dev/docs/telcoops/api-reference)
+- **Design Rationale**: [zeroleaf.dev/nebula/teleops-thinking/design-rationale](https://zeroleaf.dev/nebula/teleops-thinking/design-rationale)
+
+## Evaluation
+
+Run the evaluation script to score RCA quality:
+
+```bash
+# Basic evaluation
+python scripts/evaluate.py
+
+# Against manual labels
+python scripts/evaluate.py --labels-file docs/evaluation/manual_labels.jsonl
+
+# Export results for dashboard
+python scripts/evaluate.py --write-json storage/evaluation_results.json
 ```
 
-## Docs
-- `docs/integrations/README.md`
-- `docs/data_dictionary.md`
-- `docs/test_plan.md`
-- `docs/scenario_catalog.md`
-- `docs/demo_results.md`
-- `docs/demo_script.md`
-- `docs/demo_video_assets.md`
-- `docs/evaluation/labeling_rubric.md`
-- `docs/threat_model.md`
-- `docs/redaction_policy.md`
-- `docs/deployment_runbook.md`
+## Deployment
+
+### Cloud Run (GCP)
+
+```bash
+# Build container
+docker build -t teleops .
+
+# Deploy with Gemini (CPU-only)
+gcloud run deploy teleops \
+  --image teleops \
+  --set-env-vars LLM_PROVIDER=gemini,GEMINI_API_KEY=$GEMINI_API_KEY
+```
+
+## License
+
+This project is licensed under the MIT License.
+
+## Author
+
+**Uday Tamma**
+- Portfolio: [zeroleaf.dev](https://zeroleaf.dev)
+- GitHub: [@udaytamma](https://github.com/udaytamma)
+
+## Acknowledgments
+
+- Built as a Principal TPM capstone project
+- Demonstrates AI/ML ops for telecom domain
+- Uses Google Gemini for LLM capabilities
