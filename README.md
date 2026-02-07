@@ -2,10 +2,10 @@
 
 Intelligent root cause analysis for telecom/MSP network incidents using synthetic data, RAG pipelines, and LLM-driven diagnostics.
 
+[![CI](https://github.com/udaytamma/teleops/actions/workflows/ci.yml/badge.svg)](https://github.com/udaytamma/teleops/actions)
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.109-009688.svg)](https://fastapi.tiangolo.com)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.32-ff4b4b.svg)](https://streamlit.io)
-[![LangGraph](https://img.shields.io/badge/LangGraph-Enabled-purple.svg)](https://langchain.com)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.112-009688.svg)](https://fastapi.tiangolo.com)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.38-ff4b4b.svg)](https://streamlit.io)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ## Overview
@@ -67,7 +67,7 @@ cp .env.example .env
 python -m teleops.init_db
 
 # Start API server
-uvicorn src.api.main:app --reload --port 8000
+uvicorn teleops.api.app:app --reload --port 8000
 ```
 
 ### Running the Dashboard
@@ -112,24 +112,29 @@ streamlit run ui/streamlit_app/app.py --server.port 8501
 
 ```
 teleops/
-├── src/
-│   ├── api/                      # FastAPI application
-│   │   └── main.py               # API routes
-│   ├── services/
-│   │   ├── rca.py                # RCA generation (baseline + LLM)
-│   │   ├── rag.py                # RAG pipeline
-│   │   └── scenario_generator.py # Synthetic incident generation
-│   ├── schemas/                  # Pydantic models
-│   └── config/                   # Settings management
+├── teleops/                      # Main Python package
+│   ├── api/
+│   │   └── app.py                # FastAPI application
+│   ├── data_gen/
+│   │   └── generator.py          # Synthetic incident generation
+│   ├── incident_corr/
+│   │   └── correlator.py         # Alert correlation
+│   ├── llm/
+│   │   ├── client.py             # LLM adapter
+│   │   └── rca.py                # RCA generation (baseline + LLM)
+│   ├── rag/
+│   │   └── index.py              # RAG pipeline
+│   ├── config.py                 # Settings management
+│   ├── models.py                 # SQLAlchemy models
+│   └── db.py                     # Database setup
 ├── ui/
 │   └── streamlit_app/            # Dashboard
 │       ├── app.py                # Entry point
 │       ├── theme.py              # NOC-style theme
 │       └── pages/                # Multi-page app
-├── rag_corpus/                   # Runbook knowledge base
+├── docs/                         # Documentation & RAG corpus
 ├── storage/                      # Persistent data
-├── tests/                        # Test suite
-└── docs/                         # Additional documentation
+└── tests/                        # Test suite (17 files)
 ```
 
 ## Configuration
@@ -141,23 +146,28 @@ teleops/
 | `GEMINI_API_KEY` | Google Gemini API key | Required |
 | `LLM_PROVIDER` | `gemini` or `local_telellm` | `gemini` |
 | `LLM_TIMEOUT_SECONDS` | LLM request timeout | `60` |
-| `RAG_CORPUS_DIR` | Runbook directory | `./rag_corpus` |
+| `RAG_CORPUS_DIR` | Runbook directory | `./docs/rag_corpus` |
 | `RAG_TOP_K` | Retrieved context chunks | `4` |
 | `LOG_FORMAT` | `json` or `text` | `json` |
 
 ### RAG Corpus
 
-Place runbook markdown files in `rag_corpus/`:
+12 MSO-oriented runbooks in `docs/rag_corpus/` (~1200 lines):
 
 ```
-rag_corpus/
-├── backbone-troubleshooting.md
-├── dns-operations.md
-├── bgp-peering.md
-├── optical-transport.md
-├── security-incidents.md
-├── database-performance.md
-└── cdn-caching.md
+docs/rag_corpus/
+├── hfc-network-troubleshooting.md   # CMTS, DOCSIS, HFC plant
+├── dns-resolver-operations.md       # Residential DNS, CDN steering
+├── bgp-peering-transit.md           # IX peering, transit providers
+├── optical-transport-headend.md     # Fiber rings, DWDM, headend
+├── security-edge-incidents.md       # DDoS, CPE exploits
+├── oss-bss-performance.md           # Provisioning, billing systems
+├── video-cdn-delivery.md            # VOD, cache, ABR streaming
+├── mpls-vpn-enterprise.md           # L3VPN, Metro-E, VRF leaks
+├── voip-telephony.md                # SIP, E911, MTA, call quality
+├── iptv-linear-channels.md          # QAM, multicast, STB, EPG
+├── wifi-managed-services.md         # xFi pods, hotspots, RADIUS
+└── weather-disaster-recovery.md     # Ice storms, floods, hurricanes
 ```
 
 ## Testing
@@ -177,7 +187,7 @@ python scripts/preflight.py
 
 - **Architecture**: [zeroleaf.dev/docs/telcoops/architecture](https://zeroleaf.dev/docs/telcoops/architecture)
 - **API Reference**: [zeroleaf.dev/docs/telcoops/api-reference](https://zeroleaf.dev/docs/telcoops/api-reference)
-- **Design Rationale**: [zeroleaf.dev/nebula/teleops-thinking/design-rationale](https://zeroleaf.dev/nebula/teleops-thinking/design-rationale)
+- **Design Rationale**: [zeroleaf.dev/nebula/tops-redundant/design-rationale](https://zeroleaf.dev/nebula/tops-redundant/design-rationale)
 
 ## Evaluation
 
@@ -193,6 +203,24 @@ python scripts/evaluate.py --labels-file docs/evaluation/manual_labels.jsonl
 # Export results for dashboard
 python scripts/evaluate.py --write-json storage/evaluation_results.json
 ```
+
+### Evaluation Results (February 2026)
+
+| Metric | Baseline | LLM (Gemini) | Notes |
+|--------|----------|--------------|-------|
+| Accuracy (50 scenarios) | 100%* | 44% | String similarity scoring |
+| P50 Latency | &lt;10ms | ~2s | LLM adds network round-trip |
+| JSON Validity | 100% | 95%+ | Structured output parsing |
+| Test Coverage | 87.1% | - | 45 tests, 100% pass rate |
+
+*Baseline achieves 100% because rules are tuned to match ground truth phrasing exactly.
+
+**Interpretation:** The LLM accuracy appears lower due to string similarity scoring, which penalizes semantically correct but differently-phrased hypotheses. Semantic evaluation (embedding similarity) would show higher LLM performance.
+
+**Future Improvements:**
+- Add semantic similarity scoring (embedding-based)
+- Fine-tune prompts for more concise output
+- Expand RAG corpus with additional MSO scenarios
 
 ## Deployment
 
