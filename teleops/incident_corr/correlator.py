@@ -3,11 +3,24 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
+from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
 from teleops.models import Alert, Incident
+
+
+def _make_incident_id(tag: str) -> str:
+    """Generate a human-readable incident ID.
+
+    Format: <scenario_type>_<YYYYMMDD_HHmmss>_<short_hex>
+    Example: network_degradation_20260209_143022_a7d5
+    """
+    now = datetime.now(timezone.utc)
+    ts = now.strftime("%Y%m%d_%H%M%S")
+    short_hex = uuid4().hex[:4]
+    return f"{tag}_{ts}_{short_hex}"
 
 
 def correlate_alerts(
@@ -43,6 +56,7 @@ def correlate_alerts(
             continue
 
         incident = Incident(
+            id=_make_incident_id(tag),
             start_time=start_time,
             end_time=end_time,
             severity="critical",

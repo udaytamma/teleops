@@ -237,10 +237,32 @@ def _load_fixture(name: str) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _rotate_log_if_needed(log_path: Path, max_bytes: int, backup_count: int) -> None:
+    """Size-based log rotation shared by integration and audit logs."""
+    if not log_path.exists():
+        return
+    if log_path.stat().st_size < max_bytes:
+        return
+
+    for idx in range(backup_count, 0, -1):
+        rotated = log_path.with_name(f"{log_path.name}.{idx}")
+        if rotated.exists():
+            if idx == backup_count:
+                rotated.unlink(missing_ok=True)
+            else:
+                rotated.rename(log_path.with_name(f"{log_path.name}.{idx + 1}"))
+
+    log_path.rename(log_path.with_name(f"{log_path.name}.1"))
+
+
 def _append_integration_event(source: str, payload: dict[str, Any]) -> None:
     log_path = Path(settings.integrations_log_path)
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    _rotate_integration_log_if_needed(log_path)
+    _rotate_log_if_needed(
+        log_path,
+        max_bytes=settings.integration_log_max_bytes,
+        backup_count=settings.integration_log_backup_count,
+    )
     event = {
         "received_at": datetime.now(timezone.utc).isoformat(),
         "source": source,
@@ -250,30 +272,18 @@ def _append_integration_event(source: str, payload: dict[str, Any]) -> None:
         handle.write(json.dumps(event) + "\n")
 
 
-def _rotate_integration_log_if_needed(log_path: Path) -> None:
-    if not log_path.exists():
-        return
-    if log_path.stat().st_size < settings.integration_log_max_bytes:
-        return
-
-    for idx in range(settings.integration_log_backup_count, 0, -1):
-        rotated = log_path.with_name(f"{log_path.name}.{idx}")
-        if rotated.exists():
-            if idx == settings.integration_log_backup_count:
-                rotated.unlink(missing_ok=True)
-            else:
-                rotated.rename(log_path.with_name(f"{log_path.name}.{idx + 1}"))
-
-    log_path.rename(log_path.with_name(f"{log_path.name}.1"))
-
-
 AUDIT_LOG_PATH = Path(settings.audit_log_path)
 
 
 def _append_audit_event(event: dict[str, Any]) -> None:
-    """Append a review event to the audit log."""
+    """Append a review event to the audit log with size-based rotation."""
     log_path = AUDIT_LOG_PATH
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    _rotate_log_if_needed(
+        log_path,
+        max_bytes=settings.audit_log_max_bytes,
+        backup_count=settings.audit_log_backup_count,
+    )
     event["timestamp"] = datetime.now(timezone.utc).isoformat()
     with log_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(event) + "\n")
@@ -499,13 +509,15 @@ def generate_llm_rca(
         logger.error(f"LLM/RAG error for incident {incident_id}: {exc}")
         raise HTTPException(status_code=502, detail=f"LLM/RAG error: {exc}") from exc
 
+    # Store minimal fields needed for evaluation and traceability (not full payloads)
     artifact = RCAArtifact(
         incident_id=incident.id,
         hypotheses=result.get("hypotheses", []),
         evidence={
             "llm_evidence": result.get("evidence", {}),
-            "llm_request": request_payload,
-            "llm_response": result,
+            "rag_query": rag_query,
+            "alerts_count": len(alerts_dicts),
+            "rag_chunks_used": len(rag_context) if isinstance(rag_context, list) else 1,
         },
         confidence_scores=result.get("confidence_scores", {}),
         llm_model=result.get("model", "unknown"),
@@ -524,6 +536,7 @@ def generate_llm_rca(
 def get_latest_rca(
     incident_id: str,
     source: str = Query("llm", pattern="^(llm|baseline|any)$"),
+    status_filter: str | None = Query(None, alias="status", pattern="^(pending_review|accepted|rejected)$"),
     db: Session = Depends(get_db),
     _: None = Depends(require_api_token),
     tenant_id: str | None = Depends(require_tenant_id),
@@ -533,6 +546,8 @@ def get_latest_rca(
         query = query.filter(RCAArtifact.llm_model == "baseline-rules")
     elif source == "llm":
         query = query.filter(RCAArtifact.llm_model != "baseline-rules")
+    if status_filter:
+        query = query.filter(RCAArtifact.status == status_filter)
 
     artifact = query.order_by(RCAArtifact.timestamp.desc()).first()
     if not artifact:
@@ -666,11 +681,18 @@ def review_rca_artifact(
     payload: ReviewRequest,
     db: Session = Depends(get_db),
     _: None = Depends(require_api_token),
+    tenant_id: str | None = Depends(require_tenant_id),
 ):
     """Accept or reject an RCA hypothesis with audit trail."""
     artifact = db.query(RCAArtifact).filter(RCAArtifact.id == artifact_id).first()
     if not artifact:
         raise HTTPException(status_code=404, detail="RCA artifact not found")
+
+    # Enforce tenant isolation via the artifact's parent incident
+    if tenant_id:
+        incident = db.query(Incident).filter(Incident.id == artifact.incident_id).first()
+        if not incident or incident.tenant_id != tenant_id:
+            raise HTTPException(status_code=404, detail="RCA artifact not found")
 
     now = datetime.now(timezone.utc)
     artifact.status = payload.decision
@@ -704,6 +726,8 @@ def get_rca_audit_log(
     decision: str | None = Query(None, pattern="^(accepted|rejected)$"),
     reviewer: str | None = Query(None),
     _: None = Depends(require_metrics_token),
+    tenant_id: str | None = Depends(require_tenant_id),
+    db: Session = Depends(get_db),
 ):
     """Retrieve RCA review audit trail with optional filters."""
     events = _load_audit_events(
@@ -711,6 +735,14 @@ def get_rca_audit_log(
         decision=decision,
         reviewer=reviewer,
     )
+
+    # Enforce tenant isolation: filter audit events to incidents belonging to this tenant
+    if tenant_id:
+        tenant_incident_ids = {
+            i.id for i in db.query(Incident.id).filter(Incident.tenant_id == tenant_id).all()
+        }
+        events = [e for e in events if e.get("incident_id") in tenant_incident_ids]
+
     return {"events": events, "total": len(events)}
 
 

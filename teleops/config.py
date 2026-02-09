@@ -55,9 +55,11 @@ class Settings(BaseSettings):
     # CORS
     cors_origins: list[str] = Field(default=["http://localhost:8501", "http://localhost:3000"])
 
-    # Integration log rotation
+    # Log rotation (integration + audit)
     integration_log_max_bytes: int = 5_000_000
     integration_log_backup_count: int = 3
+    audit_log_max_bytes: int = 5_000_000
+    audit_log_backup_count: int = 3
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

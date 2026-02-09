@@ -104,13 +104,17 @@ streamlit run ui/streamlit_app/app.py --server.port 8501
 | GET | `/incidents` | List all incidents |
 | POST | `/rca/{id}/baseline` | Generate pattern-matching RCA |
 | POST | `/rca/{id}/llm` | Generate LLM RCA with RAG context |
+| GET | `/rca/{id}/latest` | Retrieve latest RCA artifact (filterable by `?status=accepted`) |
+| POST | `/rca/{artifact_id}/review` | Accept or reject an RCA hypothesis |
+| GET | `/audit/rca` | Retrieve RCA review audit trail |
 | GET | `/metrics/overview` | Dashboard metrics |
 | POST | `/reset` | Clear all incidents |
 | GET | `/health` | Health check |
 
 Notes:
-- If `REQUIRE_TENANT_ID=true`, include `X-Tenant-Id` on requests.
+- If `REQUIRE_TENANT_ID=true`, include `X-Tenant-Id` on all data endpoints (including review and audit).
 - Raw alert payloads are excluded by default; use `include_raw=true` when needed.
+- RCA artifacts carry a `status` field (`pending_review`, `accepted`, `rejected`). Use `?status=accepted` on `/rca/{id}/latest` to retrieve only reviewed artifacts.
 
 ## Project Structure
 
@@ -161,22 +165,24 @@ teleops/
 
 ### RAG Corpus
 
-12 MSO-oriented runbooks in `docs/rag_corpus/` (~1200 lines):
+14 corpus files in `docs/rag_corpus/` (12 MSO-oriented runbooks + 2 general guides, ~1200 lines):
 
 ```
 docs/rag_corpus/
-├── hfc-network-troubleshooting.md   # CMTS, DOCSIS, HFC plant
-├── dns-resolver-operations.md       # Residential DNS, CDN steering
-├── bgp-peering-transit.md           # IX peering, transit providers
-├── optical-transport-headend.md     # Fiber rings, DWDM, headend
-├── security-edge-incidents.md       # DDoS, CPE exploits
-├── oss-bss-performance.md           # Provisioning, billing systems
-├── video-cdn-delivery.md            # VOD, cache, ABR streaming
-├── mpls-vpn-enterprise.md           # L3VPN, Metro-E, VRF leaks
-├── voip-telephony.md                # SIP, E911, MTA, call quality
-├── iptv-linear-channels.md          # QAM, multicast, STB, EPG
-├── wifi-managed-services.md         # xFi pods, hotspots, RADIUS
-└── weather-disaster-recovery.md     # Ice storms, floods, hurricanes
+├── hfc-network-troubleshooting.md    # CMTS, DOCSIS, HFC plant
+├── dns-resolver-operations.md        # Residential DNS, CDN steering
+├── bgp-peering-transit.md            # IX peering, transit providers
+├── optical-transport-headend.md      # Fiber rings, DWDM, headend
+├── security-edge-incidents.md        # DDoS, CPE exploits
+├── oss-bss-performance.md            # Provisioning, billing systems
+├── video-cdn-delivery.md             # VOD, cache, ABR streaming
+├── mpls-vpn-enterprise.md            # L3VPN, Metro-E, VRF leaks
+├── voip-telephony.md                 # SIP, E911, MTA, call quality
+├── iptv-linear-channels.md           # QAM, multicast, STB, EPG
+├── wifi-managed-services.md          # xFi pods, hotspots, RADIUS
+├── weather-disaster-recovery.md      # Ice storms, floods, hurricanes
+├── network_degradation_guide.txt     # Latency/packet loss diagnostics
+└── telecom_ops_notes.txt             # Core router congestion patterns
 ```
 
 ## Testing
@@ -217,17 +223,17 @@ python scripts/evaluate.py --write-json storage/evaluation_results.json
 
 | Metric | Baseline | LLM (Gemini) | Notes |
 |--------|----------|--------------|-------|
-| Accuracy (50 scenarios) | 100%* | 44% | String similarity scoring |
+| Scoring Method | Semantic cosine similarity | Semantic cosine similarity | sentence-transformers/all-MiniLM-L6-v2 |
+| Correct Threshold | >= 0.75 | >= 0.75 | Similarity score for "correct" classification |
 | P50 Latency | &lt;10ms | ~2s | LLM adds network round-trip |
 | JSON Validity | 100% | 95%+ | Structured output parsing |
 | Test Coverage | 87.1% | - | 45 tests, 100% pass rate |
 
-*Baseline achieves 100% because rules are tuned to match ground truth phrasing exactly.
+*Baseline achieves high similarity because rules are tuned to match ground truth phrasing. LLM hypotheses are semantically correct but differently phrased, which semantic scoring captures more fairly than string matching.*
 
-**Interpretation:** The LLM accuracy appears lower due to string similarity scoring, which penalizes semantically correct but differently-phrased hypotheses. Semantic evaluation (embedding similarity) would show higher LLM performance.
+**Evaluation methodology:** The evaluation script (`scripts/evaluate.py`) uses **semantic cosine similarity** via `sentence-transformers/all-MiniLM-L6-v2` embeddings. Hypotheses scoring >= 0.75 similarity are classified as correct. Quality metrics include precision, recall, wrong-but-confident rate, and confidence calibration. Run `python scripts/evaluate.py --write-json storage/evaluation_results.json` to regenerate scores.
 
 **Future Improvements:**
-- Add semantic similarity scoring (embedding-based)
 - Fine-tune prompts for more concise output
 - Expand RAG corpus with additional MSO scenarios
 

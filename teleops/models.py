@@ -38,7 +38,7 @@ class Incident(Base):
         Index("ix_incidents_tenant_id", "tenant_id"),
     )
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    id: Mapped[str] = mapped_column(String(128), primary_key=True, default=lambda: str(uuid4()))
     start_time: Mapped[datetime] = mapped_column(DateTime)
     end_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     severity: Mapped[str] = mapped_column(String(16))
@@ -59,7 +59,7 @@ class RCAArtifact(Base):
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    incident_id: Mapped[str] = mapped_column(String(36), ForeignKey("incidents.id"))
+    incident_id: Mapped[str] = mapped_column(String(128), ForeignKey("incidents.id"))
     hypotheses: Mapped[list[str]] = mapped_column(JSON, default=list)
     evidence: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     confidence_scores: Mapped[dict[str, float]] = mapped_column(JSON, default=dict)
