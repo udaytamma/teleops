@@ -13,15 +13,8 @@ COPY ui/ ui/
 RUN useradd -m teleops && chown -R teleops:teleops /app
 USER teleops
 
-# Expose Streamlit default port
+# Railway assigns PORT dynamically; default to 8501 for local use
 EXPOSE 8501
 
-# Health check for Streamlit
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')" || exit 1
-
-# Run Streamlit
-CMD ["streamlit", "run", "ui/streamlit_app/app.py", \
-     "--server.port", "8501", \
-     "--server.headless", "true", \
-     "--server.address", "0.0.0.0"]
+# Run Streamlit with shell form to support $PORT variable expansion
+CMD sh -c 'streamlit run ui/streamlit_app/app.py --server.port ${PORT:-8501} --server.headless true --server.address 0.0.0.0'
