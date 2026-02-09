@@ -1,6 +1,7 @@
 import json
+import pytest
 
-from teleops.llm.client import _parse_json_response
+from teleops.llm.client import _parse_json_response, LLMClientError
 
 
 def test_parse_json_response_raw():
@@ -12,8 +13,8 @@ def test_parse_json_response_raw():
 def test_parse_json_response_fenced():
     payload = {"hypotheses": ["b"], "model": "test"}
     content = f"```json\n{json.dumps(payload)}\n```"
-    result = _parse_json_response(content)
-    assert result["hypotheses"] == ["b"]
+    with pytest.raises(LLMClientError):
+        _parse_json_response(content)
 
 
 def test_parse_json_response_embedded():

@@ -26,9 +26,8 @@ def _parse_json_response(content: str) -> dict[str, Any]:
     except json.JSONDecodeError:
         pass
 
-    fence_match = re.search(r"```json\s*(\{.*?\})\s*```", content, re.DOTALL)
-    if fence_match:
-        return json.loads(fence_match.group(1))
+    if re.search(r"```", content):
+        raise LLMClientError("LLM response was not valid JSON")
 
     brace_start = content.find("{")
     brace_end = content.rfind("}")

@@ -11,6 +11,6 @@
 - Alert data sent to the LLM is redacted before transmission and only the redacted summary is stored in the artifact.
 
 ## Safety Controls
-- LLM outputs must be valid JSON; fenced JSON is accepted and parsed.
+- LLM outputs must be valid JSON; reject markdown-wrapped responses.
 - Remediation steps are advisory and require human approval.
 - RCA hypotheses default to `pending_review` status and should be accepted or rejected via the review endpoint before being acted upon (process gate; API does not enforce acceptance by default).

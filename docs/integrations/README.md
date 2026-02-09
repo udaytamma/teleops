@@ -16,6 +16,8 @@ ServiceNow and Jira integrations.
 Inbound webhook payloads are appended to `storage/integration_events.jsonl`
 with a receive timestamp for audit-style review.
 
+If `REQUIRE_TENANT_ID=true`, include `X-Tenant-Id` on these endpoints.
+
 ## Example
 ```bash
 curl -X POST http://localhost:8000/integrations/servicenow/webhook \
