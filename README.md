@@ -102,6 +102,8 @@ streamlit run ui/streamlit_app/app.py --server.port 8501
 |--------|------|-------------|
 | POST | `/generate` | Generate synthetic alerts and correlate incidents |
 | GET | `/incidents` | List all incidents |
+| GET | `/alerts` | List all alerts (`include_raw=true` to include raw payloads) |
+| GET | `/incidents/{id}/alerts` | List alerts for an incident (`include_raw=true` to include raw payloads) |
 | POST | `/rca/{id}/baseline` | Generate pattern-matching RCA |
 | POST | `/rca/{id}/llm` | Generate LLM RCA with RAG context |
 | GET | `/rca/{id}/latest` | Retrieve latest RCA artifact (filterable by `?status=accepted`) |
@@ -112,8 +114,8 @@ streamlit run ui/streamlit_app/app.py --server.port 8501
 | GET | `/health` | Health check |
 
 Notes:
-- If `REQUIRE_TENANT_ID=true`, include `X-Tenant-Id` on all data endpoints (including review and audit).
-- Raw alert payloads are excluded by default; use `include_raw=true` when needed.
+- If `REQUIRE_TENANT_ID=true`, include `X-Tenant-Id` on all data endpoints (including review, audit, and integrations).
+- Raw alert payloads are excluded by default; use `include_raw=true` on `/alerts` and `/incidents/{id}/alerts` when needed.
 - RCA artifacts carry a `status` field (`pending_review`, `accepted`, `rejected`). Use `?status=accepted` on `/rca/{id}/latest` to retrieve only reviewed artifacts.
 
 ## Project Structure
@@ -225,8 +227,8 @@ python scripts/evaluate.py --write-json storage/evaluation_results.json
 |--------|----------|--------------|-------|
 | Scoring Method | Semantic cosine similarity | Semantic cosine similarity | sentence-transformers/all-MiniLM-L6-v2 |
 | Correct Threshold | >= 0.75 | >= 0.75 | Similarity score for "correct" classification |
-| Avg Similarity (synthetic) | 0.896 (11 runs) | Not run in latest results | See `storage/evaluation_results.json` |
-| Median Similarity (synthetic) | 0.902 (11 runs) | Not run in latest results | See `storage/evaluation_results.json` |
+| Avg Similarity (synthetic) | 0.894 (50 runs) | Not run in latest results | See `storage/evaluation_results.json` |
+| Median Similarity (synthetic) | 0.902 (50 runs) | Not run in latest results | See `storage/evaluation_results.json` |
 | Manual Label Avg | 0.451 (20 cases) | N/A | See `storage/evaluation_results.json` |
 | JSON Validity | Not measured in evaluation script | Not measured | LLM parsing enforces JSON at runtime |
 | Test Coverage | 79.57% | - | 28 tests, 100% pass rate (see `storage/test_results.json`) |

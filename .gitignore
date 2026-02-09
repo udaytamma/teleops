@@ -18,7 +18,8 @@ venv/
 
 # Data and logs
 teleops.db
-storage/
+storage/*
+!storage/evaluation_results.json
 *.log
 
 # OS

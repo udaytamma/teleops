@@ -5,7 +5,7 @@ Scope: Line‑by‑line review of TeleOps source + documentation (top‑level co
 ## Critical gaps
 - Potential secrets committed to repo: `.env` exists and may contain real API keys; verify and remove any live secrets. (`teleops/.env:1-20`)
 - Access control/RBAC not implemented: only optional token gates exist; no role-based enforcement beyond shared tokens. (`teleops/teleops/api/app.py:120-150`, `teleops/docs/security_controls.md:3-13`)
-- Redaction policy risk: prompts include incident + alert samples; RCA artifacts store structured outputs and redacted evidence summaries (no full prompt/response), but raw payloads can be returned when `include_raw=true`. The LLM Trace UI expects full request/response fields that the API does not persist. (`teleops/docs/redaction_policy.md:4-11`, `teleops/teleops/api/app.py:192-209`, `teleops/teleops/api/app.py:512-528`, `teleops/ui/streamlit_app/pages/3_LLM_Trace.py:72-132`)
+- LLM Trace UI expects full request/response fields that the API does not persist, so the view renders empty sections for prompt/response. (`teleops/teleops/api/app.py:512-528`, `teleops/ui/streamlit_app/pages/3_LLM_Trace.py:72-132`)
 
 ## High gaps
 - Evaluation focuses on synthetic similarity scoring and does not measure operational KPIs like time‑to‑hypothesis or latency SLAs. (`teleops/scripts/evaluate.py:97-170`, `teleops/docs/requirements.md:15-17`)

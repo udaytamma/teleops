@@ -495,15 +495,17 @@ def generate_llm_rca(
 
     alert_types = sorted({alert.alert_type for alert in alerts if alert.alert_type})
     rag_query = f"{incident.summary} | alerts: {', '.join(alert_types[:5])} | count: {len(alerts)}"
+    redacted_rag_query = _redact_obj(rag_query, tenant_id=incident.tenant_id)
     try:
         t0 = time.perf_counter()
         rag_context = get_rag_context(rag_query)
+        redacted_rag_context = _redact_obj(rag_context, tenant_id=incident.tenant_id)
         request_payload = {
             "incident": incident_dict,
             "alerts_sample": alerts_dicts[:20],
-            "rag_context": rag_context,
+            "rag_context": redacted_rag_context,
         }
-        result = llm_rca(incident_dict, alerts_dicts, rag_context)
+        result = llm_rca(incident_dict, alerts_dicts, redacted_rag_context)
         duration_ms = round((time.perf_counter() - t0) * 1000, 2)
     except Exception as exc:
         logger.error(f"LLM/RAG error for incident {incident_id}: {exc}")
@@ -516,9 +518,9 @@ def generate_llm_rca(
         evidence=_redact_obj(
             {
                 "llm_evidence": result.get("evidence", {}),
-                "rag_query": rag_query,
+                "rag_query": redacted_rag_query,
                 "alerts_count": len(alerts_dicts),
-                "rag_chunks_used": len(rag_context) if isinstance(rag_context, list) else 1,
+                "rag_chunks_used": len(redacted_rag_context) if isinstance(redacted_rag_context, list) else 1,
             },
             tenant_id=incident.tenant_id,
         ),
@@ -575,24 +577,38 @@ def get_latest_rca(
 
 
 @app.get("/integrations/servicenow/incidents")
-def get_servicenow_incidents(_: None = Depends(require_api_token)):
+def get_servicenow_incidents(
+    _: None = Depends(require_api_token),
+    tenant_id: str | None = Depends(require_tenant_id),
+):
     return _load_fixture("servicenow_incidents.json")
 
 
 @app.get("/integrations/jira/issues")
-def get_jira_issues(_: None = Depends(require_api_token)):
+def get_jira_issues(
+    _: None = Depends(require_api_token),
+    tenant_id: str | None = Depends(require_tenant_id),
+):
     return _load_fixture("jira_issues.json")
 
 
 @app.post("/integrations/servicenow/webhook")
-def ingest_servicenow_webhook(payload: ServiceNowWebhookPayload, _: None = Depends(require_admin_token)):
+def ingest_servicenow_webhook(
+    payload: ServiceNowWebhookPayload,
+    _: None = Depends(require_admin_token),
+    tenant_id: str | None = Depends(require_tenant_id),
+):
     logger.info(f"ServiceNow webhook received: {payload.number}")
     _append_integration_event("servicenow", payload.model_dump())
     return {"status": "received", "source": "servicenow"}
 
 
 @app.post("/integrations/jira/webhook")
-def ingest_jira_webhook(payload: JiraWebhookPayload, _: None = Depends(require_admin_token)):
+def ingest_jira_webhook(
+    payload: JiraWebhookPayload,
+    _: None = Depends(require_admin_token),
+    tenant_id: str | None = Depends(require_tenant_id),
+):
     logger.info(f"Jira webhook received: {payload.issue_key}")
     _append_integration_event("jira", payload.model_dump())
     return {"status": "received", "source": "jira"}

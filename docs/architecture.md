@@ -17,7 +17,7 @@
 7) Audit trail captures all review decisions.
 
 ## Evaluation Pipeline
-1) Run count is configurable; the latest stored results use 11 seeded scenarios across 11 incident types.
+1) Run count is configurable; the latest stored results use 50 seeded scenarios across 11 incident types.
 2) Score RCA hypotheses against ground truth using **semantic cosine similarity** (sentence-transformers/all-MiniLM-L6-v2).
 3) Compute decision quality metrics: precision, recall, wrong-but-confident rate, confidence calibration.
 4) Results persisted to `storage/evaluation_results.json` and displayed on Observability dashboard.

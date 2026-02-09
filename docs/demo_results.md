@@ -13,7 +13,7 @@
 | --- | --- |
 | Test pass rate | 100% |
 | Coverage | 79.57% |
-| Baseline RCA avg (synthetic) | 0.896 |
+| Baseline RCA avg (synthetic) | 0.894 |
 | LLM RCA avg (synthetic) | Not run in latest results |
 | Manual label avg | 0.451 |
 
@@ -35,12 +35,14 @@
 ## Improvements Planned
 - Expand RAG corpus with scenario-specific runbooks.
 - Add structured slots in the prompt (device, interface, symptom).
-- Increase evaluation runs to 20-50 for better confidence.
+- Increase evaluation runs beyond 50 for better confidence.
 
-## Screenshots (Drop-in)
-![TeleOps Console](docs/assets/teleops-console.png)
-![RCA Comparison](docs/assets/teleops-rca-comparison.png)
-![Observability Dashboard](docs/assets/teleops-observability.png)
+## Screenshots (Optional)
+Screenshots are not committed in this repo; add them to `docs/assets/` before a hiring demo.
+Expected filenames:
+- `teleops-console.png`
+- `teleops-rca-comparison.png`
+- `teleops-observability.png`
 
 ## Demo Video/GIF
 Use the assets here until a video link is available:
