@@ -17,7 +17,7 @@
 ## LLM Handling
 - Use robust JSON parsing for LLM outputs.
 - Avoid markdown-wrapped JSON in prompts.
-- Store LLM request/response artifacts for debugging and UI inspection.
+- Store only structured RCA outputs and metadata; do not persist full LLM prompt/response payloads.
 
 ## Product/UX
 - Prefer polished, ops-grade UI with clear hierarchy and readable typography.

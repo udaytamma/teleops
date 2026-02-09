@@ -20,4 +20,4 @@
 ## Auditability
 - Integration webhooks are recorded in `storage/integration_events.jsonl`.
 - RCA review decisions are logged to `storage/audit_log.jsonl` with reviewer identity, decision, timestamp, and notes.
-- RCA artifacts store minimal evaluation metadata (RAG query, alert count, chunk count) rather than full request/response payloads.
+- RCA artifacts store hypotheses, confidence scores, and a redacted evidence summary plus metadata (RAG query, alert count, chunk count). Raw prompt/response text is not stored.

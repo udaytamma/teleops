@@ -24,7 +24,7 @@ Observability surfaces KPIs, test coverage, and evaluation scores.
 
 7
 00:01:55,000 --> 00:02:15,000
-Full LLM request/response is stored for auditability.
+Structured RCA outputs are stored; full prompt/response text is not.
 
 8
 00:02:15,000 --> 00:02:40,000

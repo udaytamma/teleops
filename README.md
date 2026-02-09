@@ -142,7 +142,7 @@ teleops/
 │       └── pages/                # Multi-page app
 ├── docs/                         # Documentation & RAG corpus
 ├── storage/                      # Persistent data
-└── tests/                        # Test suite (17 files)
+└── tests/                        # Test suite
 ```
 
 ## Configuration
@@ -225,13 +225,15 @@ python scripts/evaluate.py --write-json storage/evaluation_results.json
 |--------|----------|--------------|-------|
 | Scoring Method | Semantic cosine similarity | Semantic cosine similarity | sentence-transformers/all-MiniLM-L6-v2 |
 | Correct Threshold | >= 0.75 | >= 0.75 | Similarity score for "correct" classification |
-| P50 Latency | &lt;10ms | ~2s | LLM adds network round-trip |
-| JSON Validity | 100% | 95%+ | Structured output parsing |
-| Test Coverage | 87.1% | - | 45 tests, 100% pass rate |
+| Avg Similarity (synthetic) | 0.896 (11 runs) | Not run in latest results | See `storage/evaluation_results.json` |
+| Median Similarity (synthetic) | 0.902 (11 runs) | Not run in latest results | See `storage/evaluation_results.json` |
+| Manual Label Avg | 0.451 (20 cases) | N/A | See `storage/evaluation_results.json` |
+| JSON Validity | Not measured in evaluation script | Not measured | LLM parsing enforces JSON at runtime |
+| Test Coverage | 79.57% | - | 28 tests, 100% pass rate (see `storage/test_results.json`) |
 
 *Baseline achieves high similarity because rules are tuned to match ground truth phrasing. LLM hypotheses are semantically correct but differently phrased, which semantic scoring captures more fairly than string matching.*
 
-**Evaluation methodology:** The evaluation script (`scripts/evaluate.py`) uses **semantic cosine similarity** via `sentence-transformers/all-MiniLM-L6-v2` embeddings. Hypotheses scoring >= 0.75 similarity are classified as correct. Quality metrics include precision, recall, wrong-but-confident rate, and confidence calibration. Run `python scripts/evaluate.py --write-json storage/evaluation_results.json` to regenerate scores.
+**Evaluation methodology:** The evaluation script (`scripts/evaluate.py`) uses **semantic cosine similarity** via `sentence-transformers/all-MiniLM-L6-v2` embeddings. Hypotheses scoring >= 0.75 similarity are classified as correct. Quality metrics include precision, recall, wrong-but-confident rate, and confidence calibration. LLM results are optional and will be `null` if the LLM call fails or is not configured. Run `python scripts/evaluate.py --write-json storage/evaluation_results.json` to regenerate scores.
 
 **Future Improvements:**
 - Fine-tune prompts for more concise output

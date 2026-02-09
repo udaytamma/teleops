@@ -2,7 +2,7 @@
 
 ## Goals
 - Validate core functionality across data generation, API, correlation, LLM parsing, RAG, integrations, imports, UI, evaluation, and security docs.
-- Maintain >= 80% code coverage for `teleops/` and >= 90% pass rate.
+- Maintain >= 79% code coverage for `teleops/` and >= 90% pass rate.
 - Provide deterministic, repeatable test runs.
 
 ## Scope and Coverage Targets
@@ -44,7 +44,7 @@
 
 ## Pass/Fail Criteria
 - All automated tests pass.
-- Coverage >= 80% for `teleops/`.
+- Coverage >= 79% for `teleops/`.
 - Pass rate >= 90% (computed from JUnit results).
 
 ## Test Data

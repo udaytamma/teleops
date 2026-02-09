@@ -12,12 +12,12 @@
 2) Correlate alerts into incidents using tag-based grouping.
 3) Run baseline RCA (pattern matching, &lt;10ms).
 4) Run LLM RCA with RAG context (Gemini 2.0 Flash, ~2s).
-5) **Human reviews and accepts/rejects hypothesis** (mandatory gate).
+5) **Human reviews and accepts/rejects hypothesis** (process gate; API supports status filtering but does not enforce acceptance by default).
 6) Display comparison results with timing and confidence metrics.
 7) Audit trail captures all review decisions.
 
 ## Evaluation Pipeline
-1) Generate 50 seeded scenarios across 11 incident types.
+1) Run count is configurable; the latest stored results use 11 seeded scenarios across 11 incident types.
 2) Score RCA hypotheses against ground truth using **semantic cosine similarity** (sentence-transformers/all-MiniLM-L6-v2).
 3) Compute decision quality metrics: precision, recall, wrong-but-confident rate, confidence calibration.
 4) Results persisted to `storage/evaluation_results.json` and displayed on Observability dashboard.
@@ -43,6 +43,8 @@ Fully autonomous RCA is dangerous in telecom operations. A wrong hypothesis acte
 | **Remediation planning** | **No** | **Yes** | Operator designs corrective actions |
 | **Remediation execution** | **No** | **Yes** | Operator confirms and executes changes |
 | Post-incident review | Assisted | Yes | AI summarizes, human validates lessons |
+
+MVP note: The API does not enforce acceptance by default; consumers should query `/rca/{id}/latest?status=accepted` to enforce this gate.
 
 ### Why Fully Autonomous RCA Is Dangerous
 

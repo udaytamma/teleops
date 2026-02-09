@@ -3,24 +3,17 @@
 Scope: Line‑by‑line review of TeleOps source + documentation (top‑level config, `.github/`, `teleops/`, `ui/`, `scripts/`, `docs/`, `tests/`). Generated artifacts (logs, coverage outputs, DB files, pyc) are treated as hygiene findings rather than source.
 
 ## Critical gaps
-- Secrets committed to repo: `.env` contains a live Gemini API key and should be removed and rotated. (`teleops/.env:4`)
-- Dockerized UI cannot start: Docker image never copies `ui/`, but docker‑compose launches Streamlit from `ui/streamlit_app/app.py`, so the file is missing in the container. (`teleops/Dockerfile:15-17`, `teleops/docker-compose.yml:28`)
-- Dockerized UI cannot reach API: UI reads `TELEOPS_API_URL`, but docker‑compose provides `API_BASE_URL`, so UI defaults to localhost inside the container. (`teleops/docker-compose.yml:27`, `teleops/ui/streamlit_app/pages/1_Incident_Generator.py:23`, `teleops/ui/streamlit_app/pages/2_Observability.py:11`, `teleops/ui/streamlit_app/pages/3_LLM_Trace.py:11`)
-- Access control/RBAC not implemented: only optional token gate on some write/metrics endpoints; read endpoints and RCA fetch are open despite role‑based access claims. (`teleops/teleops/api/app.py:145-153`, `teleops/teleops/api/app.py:156-158`, `teleops/teleops/api/app.py:199-208`, `teleops/teleops/api/app.py:302-307`, `teleops/docs/security_controls.md:9-11`)
-- Redaction policy violated and sensitive data exposure: prompts include incident + alert samples; RCA artifacts persist full LLM request/response; UI renders raw alerts/RAG context; API returns raw_payload. Policy says strip IPs/emails and avoid raw payloads in UI. (`teleops/docs/redaction_policy.md:4-6`, `teleops/teleops/llm/rca.py:148-150`, `teleops/teleops/api/app.py:93`, `teleops/teleops/api/app.py:284-291`, `teleops/ui/streamlit_app/pages/3_LLM_Trace.py:69-106`)
+- Potential secrets committed to repo: `.env` exists and may contain real API keys; verify and remove any live secrets. (`teleops/.env:1-20`)
+- Access control/RBAC not implemented: only optional token gates exist; no role-based enforcement beyond shared tokens. (`teleops/teleops/api/app.py:120-150`, `teleops/docs/security_controls.md:3-13`)
+- Redaction policy risk: prompts include incident + alert samples; RCA artifacts store structured outputs and redacted evidence summaries (no full prompt/response), but raw payloads can be returned when `include_raw=true`. The LLM Trace UI expects full request/response fields that the API does not persist. (`teleops/docs/redaction_policy.md:4-11`, `teleops/teleops/api/app.py:192-209`, `teleops/teleops/api/app.py:512-528`, `teleops/ui/streamlit_app/pages/3_LLM_Trace.py:72-132`)
 
 ## High gaps
-- RAG query hard‑coded to “network degradation” for all incidents; ignores incident summary and alert content. (`teleops/teleops/api/app.py:271`)
-- Evaluation methodology misaligned with success metrics: fixed incident summary + constant RAG query + string similarity scoring; doesn’t measure the defined accuracy/time‑to‑hypothesis targets. (`teleops/scripts/evaluate.py:17-44`, `teleops/docs/requirements.md:15-17`)
-- Tenant isolation not enforced: tenant_id fields exist but list endpoints return all alerts/incidents without tenant scoping. (`teleops/teleops/models.py:28`, `teleops/teleops/models.py:45`, `teleops/teleops/api/app.py:199-208`)
-- Audit log rotation claim not implemented: integration events appended to JSONL with no rotation/retention controls. (`teleops/docs/security_controls.md:12`, `teleops/teleops/api/app.py:123-132`)
+- Evaluation focuses on synthetic similarity scoring and does not measure operational KPIs like time‑to‑hypothesis or latency SLAs. (`teleops/scripts/evaluate.py:97-170`, `teleops/docs/requirements.md:15-17`)
+- Tenant isolation is optional: when `REQUIRE_TENANT_ID=false`, list endpoints return all alerts/incidents without tenant scoping. (`teleops/teleops/api/app.py:378-402`, `teleops/teleops/config.py:53`)
 
 ## Medium gaps
-- Gemini timeout setting defined but not applied to SDK call; risk of long/hanging requests and config drift. (`teleops/teleops/config.py:31`, `teleops/teleops/llm/client.py:88-96`)
-- RAG index built/loaded per request without caching; adds latency and cost on RCA calls. (`teleops/teleops/rag/index.py:60-62`, `teleops/teleops/api/app.py:273`)
-- Docker compose uses a local SQLite file without a DB volume; data is lost on container rebuilds. (`teleops/docker-compose.yml:12-15`)
+- Docker compose uses a local SQLite file without a DB volume; data is lost on container rebuilds. (`teleops/docker-compose.yml:12-16`, `teleops/teleops/config.py:17`)
 - Generated artifacts committed (DB/logs/coverage/pyc) indicate hygiene gaps and potential data leakage: `teleops/teleops.db`, `teleops/storage/*`, `teleops/**/__pycache__/*`.
-- Default LLM provider mismatch between docs and config (README says `gemini`, config defaults to `local_telellm`). (`teleops/README.md:147`, `teleops/teleops/config.py:21`)
 
 ## Missing Principal TPM artifacts / program‑level depth
 - PRD / product strategy: `requirements.md` is MVP‑level and lacks user research, competitive analysis, and acceptance criteria traceability to tests/metrics. (`teleops/docs/requirements.md:1-21`)
