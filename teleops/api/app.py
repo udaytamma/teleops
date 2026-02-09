@@ -460,7 +460,7 @@ def generate_baseline_rca(
     artifact = RCAArtifact(
         incident_id=incident.id,
         hypotheses=result["hypotheses"],
-        evidence=result["evidence"],
+        evidence=_redact_obj(result["evidence"], tenant_id=incident.tenant_id),
         confidence_scores=result["confidence_scores"],
         llm_model=result["model"],
         duration_ms=duration_ms,
@@ -513,12 +513,15 @@ def generate_llm_rca(
     artifact = RCAArtifact(
         incident_id=incident.id,
         hypotheses=result.get("hypotheses", []),
-        evidence={
-            "llm_evidence": result.get("evidence", {}),
-            "rag_query": rag_query,
-            "alerts_count": len(alerts_dicts),
-            "rag_chunks_used": len(rag_context) if isinstance(rag_context, list) else 1,
-        },
+        evidence=_redact_obj(
+            {
+                "llm_evidence": result.get("evidence", {}),
+                "rag_query": rag_query,
+                "alerts_count": len(alerts_dicts),
+                "rag_chunks_used": len(rag_context) if isinstance(rag_context, list) else 1,
+            },
+            tenant_id=incident.tenant_id,
+        ),
         confidence_scores=result.get("confidence_scores", {}),
         llm_model=result.get("model", "unknown"),
         duration_ms=duration_ms,

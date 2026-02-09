@@ -28,14 +28,13 @@
 ## Why LLM Scores Lag (Short Analysis)
 - **Prompt generality**: LLM returns generic hypotheses rather than matching specific ground-truth strings.
 - **RAG depth**: The RAG corpus is intentionally minimal; evidence is present but not highly specific.
-- **Similarity scoring**: The evaluation rubric rewards exact or near-exact matches; LLM paraphrases are penalized.
+- **Semantic scoring**: Evaluation uses cosine similarity via `sentence-transformers/all-MiniLM-L6-v2`. LLM paraphrases score lower than exact baseline matches but are no longer penalized as harshly as with string matching.
 - **Run count**: Limited runs reduce statistical stability.
 
 ## Improvements Planned
 - Expand RAG corpus with scenario-specific runbooks.
 - Add structured slots in the prompt (device, interface, symptom).
-- Use semantic similarity or rubric-based scoring (not exact matching only).
-- Increase evaluation runs to 20–50 for better confidence.
+- Increase evaluation runs to 20-50 for better confidence.
 
 ## Screenshots (Drop-in)
 ![TeleOps Console](docs/assets/teleops-console.png)
