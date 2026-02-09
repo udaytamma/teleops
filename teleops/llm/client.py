@@ -26,7 +26,7 @@ def _parse_json_response(content: str) -> dict[str, Any]:
     except json.JSONDecodeError:
         pass
 
-    fence_match = re.search(r"```json\\s*(\\{.*?\\})\\s*```", content, re.DOTALL)
+    fence_match = re.search(r"```json\s*(\{.*?\})\s*```", content, re.DOTALL)
     if fence_match:
         return json.loads(fence_match.group(1))
 
@@ -93,7 +93,15 @@ class GeminiClient(BaseLLMClient):
         generation_config = genai.GenerationConfig(
             temperature=0.2,
         )
-        response = model.generate_content(prompt, generation_config=generation_config)
+        try:
+            response = model.generate_content(
+                prompt,
+                generation_config=generation_config,
+                request_options={"timeout": settings.gemini_timeout_seconds},
+            )
+        except TypeError:
+            # Older SDKs may not support request_options
+            response = model.generate_content(prompt, generation_config=generation_config)
         logger.info(f"Gemini response received, parsing JSON ({len(response.text)} chars)")
         return _parse_json_response(response.text)
 

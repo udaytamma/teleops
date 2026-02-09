@@ -20,9 +20,14 @@ from theme import (
     empty_state,
 )
 
-API_URL = os.getenv("TELEOPS_API_URL", "http://localhost:8000")
+API_URL = os.getenv("TELEOPS_API_URL") or os.getenv("API_BASE_URL", "http://localhost:8000")
 API_TOKEN = os.getenv("TELEOPS_API_TOKEN", "")
-REQUEST_HEADERS = {"X-API-Key": API_TOKEN} if API_TOKEN else {}
+TENANT_ID = os.getenv("TELEOPS_TENANT_ID", "")
+REQUEST_HEADERS = {}
+if API_TOKEN:
+    REQUEST_HEADERS["X-API-Key"] = API_TOKEN
+if TENANT_ID:
+    REQUEST_HEADERS["X-Tenant-Id"] = TENANT_ID
 
 SCENARIOS = {
     "network_degradation": ("Network Degradation", "Packet loss and latency issues"),
@@ -414,3 +419,67 @@ if baseline_payload or llm_payload:
             render_rca_panel("LLM RCA", llm_payload, is_llm=True)
         else:
             st.markdown("<p style='color: var(--ink-dim); padding: 20px; text-align: center;'>LLM RCA not available</p>", unsafe_allow_html=True)
+
+    # --- Human Review Section ---
+    divider()
+    st.markdown(
+        """
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: var(--ink-strong);">Hypothesis Review</h3>
+            <span style="font-size: 13px; color: var(--ink-dim);">Accept or reject RCA hypotheses (human-in-the-loop gate)</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Determine which artifacts to review
+    reviewable = []
+    if baseline_payload and baseline_payload.get("artifact_id"):
+        reviewable.append(("Baseline", baseline_payload))
+    if llm_payload and llm_payload.get("artifact_id"):
+        reviewable.append(("LLM", llm_payload))
+
+    if reviewable:
+        reviewer_name = st.text_input("Reviewer Name", value="", placeholder="Enter your name or operator ID")
+        review_notes = st.text_area("Notes (optional)", value="", placeholder="Observations, corrections, or context", height=80)
+
+        review_cols = st.columns(len(reviewable))
+        for idx, (label, rca_payload) in enumerate(reviewable):
+            with review_cols[idx]:
+                artifact_id = rca_payload["artifact_id"]
+                hypothesis = rca_payload.get("hypotheses", ["N/A"])[0][:60]
+                st.markdown(f"**{label}:** {hypothesis}...")
+
+                btn_col1, btn_col2 = st.columns(2)
+                with btn_col1:
+                    if st.button(f"Accept", key=f"accept_{label}", use_container_width=True):
+                        if not reviewer_name.strip():
+                            st.error("Reviewer name required")
+                        else:
+                            resp = requests.post(
+                                f"{API_URL}/rca/{artifact_id}/review",
+                                json={"decision": "accepted", "reviewed_by": reviewer_name.strip(), "notes": review_notes or None},
+                                headers=REQUEST_HEADERS,
+                                timeout=10,
+                            )
+                            if resp.status_code < 400:
+                                st.success(f"{label} hypothesis accepted")
+                            else:
+                                st.error(f"Review failed: {resp.text}")
+                with btn_col2:
+                    if st.button(f"Reject", key=f"reject_{label}", use_container_width=True):
+                        if not reviewer_name.strip():
+                            st.error("Reviewer name required")
+                        else:
+                            resp = requests.post(
+                                f"{API_URL}/rca/{artifact_id}/review",
+                                json={"decision": "rejected", "reviewed_by": reviewer_name.strip(), "notes": review_notes or None},
+                                headers=REQUEST_HEADERS,
+                                timeout=10,
+                            )
+                            if resp.status_code < 400:
+                                st.warning(f"{label} hypothesis rejected")
+                            else:
+                                st.error(f"Review failed: {resp.text}")
+    else:
+        st.caption("Run RCA above to generate hypotheses for review.")

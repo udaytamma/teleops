@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String, Text
+from sqlalchemy import Index, JSON, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -14,6 +14,10 @@ class Base(DeclarativeBase):
 
 class Alert(Base):
     __tablename__ = "alerts"
+    __table_args__ = (
+        Index("ix_alerts_tenant_id", "tenant_id"),
+        Index("ix_alerts_timestamp", "timestamp"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
@@ -30,6 +34,9 @@ class Alert(Base):
 
 class Incident(Base):
     __tablename__ = "incidents"
+    __table_args__ = (
+        Index("ix_incidents_tenant_id", "tenant_id"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     start_time: Mapped[datetime] = mapped_column(DateTime)
@@ -47,6 +54,9 @@ class Incident(Base):
 
 class RCAArtifact(Base):
     __tablename__ = "rca_artifacts"
+    __table_args__ = (
+        Index("ix_rca_incident_id", "incident_id"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     incident_id: Mapped[str] = mapped_column(String(36), ForeignKey("incidents.id"))
@@ -55,3 +65,7 @@ class RCAArtifact(Base):
     confidence_scores: Mapped[dict[str, float]] = mapped_column(JSON, default=dict)
     llm_model: Mapped[str] = mapped_column(String(128))
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    duration_ms: Mapped[float | None] = mapped_column(nullable=True)
+    status: Mapped[str | None] = mapped_column(String(24), nullable=True, default="pending_review")
+    reviewed_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

@@ -40,9 +40,9 @@ def test_integration_webhook_logging(client, tmp_path, monkeypatch):
     assert event["payload"]["number"] == "INC0001"
 
 
-def test_api_token_enforced(client, monkeypatch):
-    monkeypatch.setattr(settings, "api_token", "secret-token")
-    # Use valid payload to ensure we're testing auth, not validation
+def test_admin_token_enforced(client, monkeypatch):
+    monkeypatch.setattr(settings, "admin_token", "secret-admin-token")
+    # Webhook endpoints use require_admin_token, not require_api_token
     payload = {
         "sys_id": "abc123",
         "number": "INC002",

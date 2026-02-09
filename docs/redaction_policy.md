@@ -3,7 +3,7 @@
 ## Redaction Rules
 - Strip IPs and email-like tokens from LLM prompts.
 - Replace tenant identifiers with stable anonymized aliases.
-- Do not include full raw payloads in UI unless explicitly requested.
+- Do not include full raw payloads in UI unless explicitly requested via `include_raw=true`.
 
 ## Safety Controls
 - LLM outputs must be valid JSON; reject markdown-wrapped responses.

@@ -18,9 +18,9 @@ class Settings(BaseSettings):
 
     # LLM provider selection
     # local_telellm | hosted_telellm | gemini
-    llm_provider: str = "local_telellm"
-    llm_model: str = "tele-llm-3b"
-    llm_timeout_seconds: float = 60.0  # Configurable timeout for LLM requests
+    llm_provider: str = "gemini"
+    llm_model: str = "gemini-2.0-flash"
+    llm_timeout_seconds: float = 60.0
 
     # OpenAI-compatible endpoint for local/hosted Tele-LLM
     llm_base_url: str = "http://localhost:8001/v1"
@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # Gemini
     gemini_api_key: str | None = None
-    gemini_timeout_seconds: float = 120.0  # Gemini may need longer timeout
+    gemini_timeout_seconds: float = 120.0
 
     # RAG
     rag_corpus_dir: str = "./docs/rag_corpus"
@@ -43,8 +43,21 @@ class Settings(BaseSettings):
     test_results_path: str = "./storage/test_results.json"
     evaluation_results_path: str = "./storage/evaluation_results.json"
 
+    # Audit log
+    audit_log_path: str = "./storage/audit_log.jsonl"
+
     # Access control (optional)
     api_token: str | None = None
+    admin_token: str | None = None
+    metrics_token: str | None = None
+    require_tenant_id: bool = False
+
+    # CORS
+    cors_origins: list[str] = Field(default=["http://localhost:8501", "http://localhost:3000"])
+
+    # Integration log rotation
+    integration_log_max_bytes: int = 5_000_000
+    integration_log_backup_count: int = 3
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

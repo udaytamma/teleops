@@ -23,11 +23,15 @@ htmlcov
 
 # Environment
 .env
-.env.local
+.env.*
+!.env.example
 
 # Database
 teleops.db
 *.db
+
+# Storage (created at runtime)
+storage/
 
 # Logs and temp files
 storage/api.log

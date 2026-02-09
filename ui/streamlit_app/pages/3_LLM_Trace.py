@@ -8,9 +8,14 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from theme import inject_theme, hero, divider, nav_links, badge, empty_state
 
-API_URL = os.getenv("TELEOPS_API_URL", "http://localhost:8000")
+API_URL = os.getenv("TELEOPS_API_URL") or os.getenv("API_BASE_URL", "http://localhost:8000")
 API_TOKEN = os.getenv("TELEOPS_API_TOKEN", "")
-REQUEST_HEADERS = {"X-API-Key": API_TOKEN} if API_TOKEN else {}
+TENANT_ID = os.getenv("TELEOPS_TENANT_ID", "")
+REQUEST_HEADERS = {}
+if API_TOKEN:
+    REQUEST_HEADERS["X-API-Key"] = API_TOKEN
+if TENANT_ID:
+    REQUEST_HEADERS["X-Tenant-Id"] = TENANT_ID
 
 st.set_page_config(page_title="LLM Response Viewer", layout="wide")
 inject_theme()

@@ -108,6 +108,10 @@ streamlit run ui/streamlit_app/app.py --server.port 8501
 | POST | `/reset` | Clear all incidents |
 | GET | `/health` | Health check |
 
+Notes:
+- If `REQUIRE_TENANT_ID=true`, include `X-Tenant-Id` on requests.
+- Raw alert payloads are excluded by default; use `include_raw=true` when needed.
+
 ## Project Structure
 
 ```
@@ -149,6 +153,11 @@ teleops/
 | `RAG_CORPUS_DIR` | Runbook directory | `./docs/rag_corpus` |
 | `RAG_TOP_K` | Retrieved context chunks | `4` |
 | `LOG_FORMAT` | `json` or `text` | `json` |
+| `API_TOKEN` | API token for read/write endpoints | optional |
+| `ADMIN_TOKEN` | Admin token for destructive actions | optional |
+| `METRICS_TOKEN` | Token for `/metrics/overview` | optional |
+| `REQUIRE_TENANT_ID` | Enforce `X-Tenant-Id` header | `false` |
+| `TELEOPS_TENANT_ID` | UI header value for tenant | optional |
 
 ### RAG Corpus
 

@@ -1,21 +1,46 @@
-"""Evaluation script for TeleOps MVP."""
+"""Evaluation script for TeleOps MVP.
+
+Uses semantic (embedding-based) similarity to score RCA hypotheses
+against ground truth, replacing the original string-matching approach.
+"""
 
 from __future__ import annotations
 
 import statistics
-from difflib import SequenceMatcher
-
+import re
 import argparse
 import json
 from pathlib import Path
+
+import numpy as np
+from sentence_transformers import SentenceTransformer
 
 from teleops.data_gen.generator import ScenarioConfig, generate_scenario
 from teleops.llm.rca import baseline_rca, llm_rca
 from teleops.rag.index import get_rag_context
 
+# Same embedding model used by the RAG pipeline
+_MODEL = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+
+# Thresholds for quality metrics
+CORRECT_THRESHOLD = 0.75  # Semantic similarity >= this = correct identification
+WRONG_CONFIDENT_SIM = 0.5  # Below this = wrong
+WRONG_CONFIDENT_CONF = 0.7  # Above this confidence + wrong = "wrong but confident"
+
+
+def _normalize(text: str) -> str:
+    text = text.lower()
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
 
 def similarity(a: str, b: str) -> float:
-    return SequenceMatcher(None, a, b).ratio()
+    """Compute cosine similarity between two texts using sentence embeddings."""
+    embeddings = _MODEL.encode([_normalize(a), _normalize(b)])
+    cosine = float(np.dot(embeddings[0], embeddings[1]) / (
+        np.linalg.norm(embeddings[0]) * np.linalg.norm(embeddings[1])
+    ))
+    return max(0.0, cosine)  # Clamp negatives to 0
 
 
 def score_output(output: dict, ground_truth: str) -> float:
@@ -26,32 +51,120 @@ def score_output(output: dict, ground_truth: str) -> float:
     return best
 
 
+def _get_max_confidence(output: dict) -> float:
+    """Extract the highest confidence score from an RCA output."""
+    scores = output.get("confidence_scores", {})
+    if not scores:
+        return 0.0
+    return max(scores.values())
+
+
+def compute_quality_metrics(scenarios: list[dict]) -> dict:
+    """Compute precision, recall, wrong-but-confident rate, and confidence calibration."""
+    results = {}
+    for source in ("baseline", "llm"):
+        score_key = f"{source}_score"
+        conf_key = f"{source}_confidence"
+
+        attempted = [s for s in scenarios if s.get(score_key) is not None]
+        if not attempted:
+            results[source] = None
+            continue
+
+        correct = [s for s in attempted if s[score_key] >= CORRECT_THRESHOLD]
+        incorrect = [s for s in attempted if s[score_key] < CORRECT_THRESHOLD]
+        wrong_confident = [
+            s for s in attempted
+            if s[score_key] < WRONG_CONFIDENT_SIM and s.get(conf_key, 0) >= WRONG_CONFIDENT_CONF
+        ]
+
+        correct_confs = [s[conf_key] for s in correct if s.get(conf_key) is not None]
+        incorrect_confs = [s[conf_key] for s in incorrect if s.get(conf_key) is not None]
+
+        results[source] = {
+            "precision": round(len(correct) / len(attempted), 3) if attempted else 0.0,
+            "recall": round(len(correct) / len(scenarios), 3) if scenarios else 0.0,
+            "wrong_but_confident_rate": round(len(wrong_confident) / len(attempted), 3) if attempted else 0.0,
+            "wrong_but_confident_count": len(wrong_confident),
+            "avg_confidence_correct": round(statistics.mean(correct_confs), 3) if correct_confs else None,
+            "avg_confidence_incorrect": round(statistics.mean(incorrect_confs), 3) if incorrect_confs else None,
+            "total_attempted": len(attempted),
+            "total_correct": len(correct),
+        }
+    return results
+
+
 def run_eval(num_runs: int = 50) -> dict:
     baseline_scores = []
     llm_scores = []
+    per_scenario = []
+
+    scenario_types = [
+        "network_degradation",
+        "dns_outage",
+        "bgp_flap",
+        "fiber_cut",
+        "router_freeze",
+        "isp_peering_congestion",
+        "ddos_edge",
+        "mpls_vpn_leak",
+        "cdn_cache_stampede",
+        "firewall_rule_misconfig",
+        "database_latency_spike",
+    ]
 
     for seed in range(num_runs):
-        config = ScenarioConfig(seed=seed)
+        incident_type = scenario_types[seed % len(scenario_types)]
+        config = ScenarioConfig(seed=seed, incident_type=incident_type)
         alerts, ground_truth = generate_scenario(config)
 
-        incident_summary = "Correlated incident for tag: network_degradation"
+        incident_summary = f"Correlated incident for tag: {ground_truth.incident_type}"
         baseline = baseline_rca(incident_summary)
-        baseline_scores.append(score_output(baseline, ground_truth.root_cause))
+        b_score = score_output(baseline, ground_truth.root_cause)
+        baseline_scores.append(b_score)
 
-        rag_context = get_rag_context("network degradation packet loss latency")
+        scenario_entry = {
+            "scenario_type": incident_type,
+            "seed": seed,
+            "ground_truth": ground_truth.root_cause,
+            "baseline_hypothesis": baseline["hypotheses"][0] if baseline.get("hypotheses") else None,
+            "baseline_score": round(b_score, 3),
+            "baseline_confidence": _get_max_confidence(baseline),
+            "llm_hypothesis": None,
+            "llm_score": None,
+            "llm_confidence": None,
+        }
+
+        rag_context = get_rag_context(f"{ground_truth.incident_type} {ground_truth.root_cause}")
         try:
             llm_out = llm_rca({"summary": incident_summary}, alerts, rag_context)
-            llm_scores.append(score_output(llm_out, ground_truth.root_cause))
+            l_score = score_output(llm_out, ground_truth.root_cause)
+            llm_scores.append(l_score)
+            scenario_entry["llm_hypothesis"] = llm_out["hypotheses"][0] if llm_out.get("hypotheses") else None
+            scenario_entry["llm_score"] = round(l_score, 3)
+            scenario_entry["llm_confidence"] = _get_max_confidence(llm_out)
         except Exception:
-            # If LLM not configured, skip scoring.
             pass
 
+        per_scenario.append(scenario_entry)
+
+    quality_metrics = compute_quality_metrics(per_scenario)
+
     results = {
-        "baseline_avg": statistics.mean(baseline_scores) if baseline_scores else 0.0,
-        "baseline_median": statistics.median(baseline_scores) if baseline_scores else 0.0,
-        "llm_avg": statistics.mean(llm_scores) if llm_scores else None,
-        "llm_median": statistics.median(llm_scores) if llm_scores else None,
+        "baseline_avg": round(statistics.mean(baseline_scores), 3) if baseline_scores else 0.0,
+        "baseline_median": round(statistics.median(baseline_scores), 3) if baseline_scores else 0.0,
+        "llm_avg": round(statistics.mean(llm_scores), 3) if llm_scores else None,
+        "llm_median": round(statistics.median(llm_scores), 3) if llm_scores else None,
         "runs": num_runs,
+        "scoring_method": "semantic_cosine_similarity",
+        "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+        "thresholds": {
+            "correct": CORRECT_THRESHOLD,
+            "wrong_confident_similarity": WRONG_CONFIDENT_SIM,
+            "wrong_confident_confidence": WRONG_CONFIDENT_CONF,
+        },
+        "quality_metrics": quality_metrics,
+        "per_scenario": per_scenario,
     }
     return results
 
@@ -77,8 +190,8 @@ def run_manual_label_eval(labels: list[dict]) -> dict:
 
     return {
         "manual_label_cases": len(labels),
-        "manual_label_avg": statistics.mean(scores) if scores else 0.0,
-        "manual_label_median": statistics.median(scores) if scores else 0.0,
+        "manual_label_avg": round(statistics.mean(scores), 3) if scores else 0.0,
+        "manual_label_median": round(statistics.median(scores), 3) if scores else 0.0,
     }
 
 
@@ -106,4 +219,4 @@ if __name__ == "__main__":
 
     if args.write_json:
         Path(args.write_json).write_text(json.dumps(results, indent=2), encoding="utf-8")
-    print(results)
+    print(json.dumps(results, indent=2))

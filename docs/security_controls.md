@@ -6,10 +6,11 @@
 - Platform Owner: configuration and audit review.
 
 ## Controls
-- API gateway enforces role-based access in production deployments.
-- Optional API token gate protects write + metrics endpoints in the demo.
-- Sensitive endpoints (LLM output, audit logs) require elevated role.
-- Logs are stored append-only and rotated regularly.
+- Optional API token gate protects read + write endpoints in the demo.
+- Admin token is required for destructive actions (reset) and webhook writes.
+- Metrics endpoints can be protected with a dedicated metrics token.
+- Tenant isolation enforced when `REQUIRE_TENANT_ID=true` (via `X-Tenant-Id` header).
+- Logs are stored append-only with size-based rotation in the demo.
 
 ## Auditability
 - Integration webhooks are recorded in `storage/integration_events.jsonl`.
