@@ -507,11 +507,6 @@ def generate_llm_rca(
         t0 = time.perf_counter()
         rag_context = get_rag_context(rag_query)
         redacted_rag_context = _redact_obj(rag_context, tenant_id=incident.tenant_id)
-        request_payload = {
-            "incident": incident_dict,
-            "alerts_sample": alerts_dicts[:20],
-            "rag_context": redacted_rag_context,
-        }
         result = llm_rca(incident_dict, alerts_dicts, redacted_rag_context)
         duration_ms = round((time.perf_counter() - t0) * 1000, 2)
     except Exception as exc:
@@ -662,7 +657,7 @@ def get_metrics_overview(
     reviewed_total = accepted + rejected
 
     # Time-to-context metrics
-    MANUAL_TRIAGE_ESTIMATE_MIN = 25  # Industry benchmark for telecom NOC
+    manual_triage_estimate_min = 25  # Industry benchmark for telecom NOC
     baseline_durations = [
         a.duration_ms for a in all_artifacts
         if getattr(a, "duration_ms", None) is not None and a.llm_model == "baseline-rules"
@@ -678,7 +673,7 @@ def get_metrics_overview(
     improvement_factor = None
     compare_ms = llm_median_ms or baseline_median_ms
     if compare_ms and compare_ms > 0:
-        improvement_factor = round((MANUAL_TRIAGE_ESTIMATE_MIN * 60 * 1000) / compare_ms)
+        improvement_factor = round((manual_triage_estimate_min * 60 * 1000) / compare_ms)
 
     return {
         "counts": {
@@ -701,7 +696,7 @@ def get_metrics_overview(
         "time_to_context": {
             "baseline_median_ms": baseline_median_ms,
             "llm_median_ms": llm_median_ms,
-            "manual_estimate_min": MANUAL_TRIAGE_ESTIMATE_MIN,
+            "manual_estimate_min": manual_triage_estimate_min,
             "improvement_factor": improvement_factor,
         },
     }

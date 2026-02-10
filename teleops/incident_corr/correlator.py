@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Iterable
 from datetime import datetime, timezone
+from typing import Iterable
 from uuid import uuid4
 
 from sqlalchemy.orm import Session

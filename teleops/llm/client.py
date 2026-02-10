@@ -10,7 +10,6 @@ import httpx
 
 from teleops.config import logger, settings
 
-
 SYSTEM_PROMPT = (
     "You are a Principal Network Operations Engineer with 15 years of experience in telecom NOCs. "
     "You specialize in IP/MPLS networks, BGP routing, DNS infrastructure, optical transport, "

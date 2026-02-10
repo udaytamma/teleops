@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import re
 from datetime import datetime, timezone
 from typing import Any
 
 from teleops.llm.client import get_llm_client
-
 
 # Pattern-matching rules for baseline RCA
 # Maps keywords in incident summary/alerts to hypotheses

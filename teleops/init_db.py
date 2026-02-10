@@ -5,7 +5,6 @@ from sqlalchemy import inspect, text
 from teleops.db import engine
 from teleops.models import Base
 
-
 _RCA_MIGRATIONS = [
     ("duration_ms", "ALTER TABLE rca_artifacts ADD COLUMN duration_ms FLOAT"),
     ("status", "ALTER TABLE rca_artifacts ADD COLUMN status VARCHAR(24) DEFAULT 'pending_review'"),

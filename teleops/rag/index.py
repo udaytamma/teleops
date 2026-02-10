@@ -44,12 +44,12 @@ def build_or_load_index():
             return _INDEX
 
         (
-            SimpleDirectoryReader,
-            StorageContext,
-            VectorStoreIndex,
+            SimpleDirectoryReader,  # noqa: N806
+            StorageContext,  # noqa: N806
+            VectorStoreIndex,  # noqa: N806
             load_index_from_storage,
-            HuggingFaceEmbedding,
-            SimpleVectorStore,
+            HuggingFaceEmbedding,  # noqa: N806
+            SimpleVectorStore,  # noqa: N806
         ) = _require_llama_index()
 
         corpus_dir = Path(settings.rag_corpus_dir)
