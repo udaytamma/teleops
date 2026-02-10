@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-02-09T22:11:37.935045+00:00",
+  "environment": {
+    "platform": "macOS-26.2-arm64-arm-64bit",
+    "python": "3.12.12",
+    "processor": "arm",
+    "cpu_count": 10
+  },
+  "llm_provider": "gemini",
+  "llm_model": "gemini-2.0-flash",
+  "runs": 20,
+  "llm_errors": 0,
+  "baseline_ms": {
+    "count": 20,
+    "avg_ms": 0.119,
+    "min_ms": 0.078,
+    "p50_ms": 0.107,
+    "p90_ms": 0.185,
+    "p99_ms": 0.189,
+    "max_ms": 0.189
+  },
+  "rag_ms": {
+    "count": 20,
+    "avg_ms": 403.9,
+    "min_ms": 32.565,
+    "p50_ms": 43.283,
+    "p90_ms": 89.785,
+    "p99_ms": 5792.001,
+    "max_ms": 7128.307
+  },
+  "llm_ms": {
+    "count": 20,
+    "avg_ms": 3268.159,
+    "min_ms": 2751.288,
+    "p50_ms": 3150.699,
+    "p90_ms": 3911.558,
+    "p99_ms": 4173.54,
+    "max_ms": 4203.719
+  }
+}
