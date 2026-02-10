@@ -227,8 +227,10 @@ python scripts/evaluate.py --write-json storage/evaluation_results.json
 |--------|----------|--------------|-------|
 | Scoring Method | Semantic cosine similarity | Semantic cosine similarity | sentence-transformers/all-MiniLM-L6-v2 |
 | Correct Threshold | >= 0.75 | >= 0.75 | Similarity score for "correct" classification |
-| Avg Similarity (synthetic) | 0.894 (50 runs) | 0.658 (50 runs) | See `storage/evaluation_results.json` |
-| Median Similarity (synthetic) | 0.902 (50 runs) | 0.675 (50 runs) | See `storage/evaluation_results.json` |
+| Precision | 1.0 (50/50) | 0.4 (20/50) | Correct = similarity >= 0.75 |
+| Avg Similarity (synthetic) | 0.894 (50 runs) | 0.745 (50 runs) | See `storage/evaluation_results.json` |
+| Median Similarity (synthetic) | 0.902 (50 runs) | 0.730 (50 runs) | See `storage/evaluation_results.json` |
+| Wrong-but-Confident | 0 | 0 | High confidence + low similarity |
 | Manual Label Avg | 0.451 (20 cases) | N/A | See `storage/evaluation_results.json` |
 | JSON Validity | Not measured in evaluation script | Not measured | LLM parsing enforces JSON at runtime |
 | Test Coverage | 79.25% | - | 29 tests, 100% pass rate (see `storage/test_results.json`) |
