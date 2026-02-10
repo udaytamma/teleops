@@ -2,22 +2,21 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
-from datetime import datetime, timezone
-from pathlib import Path
+import hashlib
 import json
 import re
-import hashlib
 import time
-
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Literal
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Header
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from teleops.config import settings, logger
+from teleops.config import logger, settings
 from teleops.data_gen.generator import ScenarioConfig, generate_scenario
 from teleops.db import SessionLocal
 from teleops.incident_corr.correlator import correlate_alerts

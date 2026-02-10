@@ -1,7 +1,5 @@
-from pathlib import Path
-
-from teleops.rag import index
 from teleops.config import settings
+from teleops.rag import index
 
 
 class DummyNode:

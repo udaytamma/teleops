@@ -5,7 +5,7 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 
-from teleops.config import settings, logger
+from teleops.config import logger, settings
 
 _INDEX = None
 _INDEX_LOCK = threading.Lock()

@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-from teleops.config import settings, logger
+from teleops.config import logger, settings
 
 
 SYSTEM_PROMPT = (

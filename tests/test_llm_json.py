@@ -1,7 +1,8 @@
 import json
+
 import pytest
 
-from teleops.llm.client import _parse_json_response, LLMClientError
+from teleops.llm.client import LLMClientError, _parse_json_response
 
 
 def test_parse_json_response_raw():
