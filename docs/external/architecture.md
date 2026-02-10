@@ -1,8 +1,6 @@
 # System Architecture
 
-> Static copy of the public TelcoOps architecture page (zeroleaf.dev/docs/telcoops/architecture), imported on 2026-02-09 and adjusted to match the current implementation.
-
-TelcoOps is designed as a minimal but complete workflow: from synthetic alert ingestion to incident correlation to dual-mode RCA generation. The architecture prioritizes auditability, repeatability, and a clean separation between data, control, and AI planes.
+TeleOps is designed as a minimal but complete workflow: from synthetic alert ingestion to incident correlation to dual-mode RCA generation. The architecture prioritizes auditability, repeatability, and a clean separation between data, control, and AI planes.
 
 ## Design Principles
 - **Auditability first**: Every RCA output is stored with its evidence, model metadata, and review decisions.

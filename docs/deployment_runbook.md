@@ -1,26 +1,94 @@
 # Deployment Runbook (Cloud Run)
 
-This runbook documents a lightweight deployment path for demo purposes.
+This runbook documents deployment, operations, and cost for the TeleOps platform.
 
 ## Assumptions
 - Backend is a single FastAPI service.
 - LLM provider is hosted (Gemini or compatible) to avoid GPU needs.
 - RAG index is built locally and bundled or rebuilt on deploy.
 
-## Steps
-1) Build container image
-   - `docker build -t teleops-api .`
-2) Push image to artifact registry
-3) Deploy to Cloud Run
-   - Set env vars: `LLM_PROVIDER`, `GEMINI_API_KEY`, `DATABASE_URL`
-4) Verify health
-   - `GET /incidents` returns HTTP 200
-5) Deploy Streamlit UI (optional)
-   - Run as a separate Cloud Run service or local operator demo
+## Deployment Steps
+
+### 1. Build and Push Container Image
+```bash
+docker build -t teleops-api .
+docker tag teleops-api gcr.io/<project>/teleops-api:latest
+docker push gcr.io/<project>/teleops-api:latest
+```
+
+### 2. Deploy to Cloud Run
+```bash
+gcloud run deploy teleops-api \
+  --image gcr.io/<project>/teleops-api:latest \
+  --set-env-vars LLM_PROVIDER=gemini,GEMINI_API_KEY=<key>,DATABASE_URL=<url> \
+  --port 8000 \
+  --memory 512Mi \
+  --cpu 1
+```
+
+### 3. Verify Health
+```bash
+curl -f https://<service-url>/health
+curl -f https://<service-url>/incidents
+```
+
+### 4. Deploy Streamlit UI (Optional)
+- Run as a separate Cloud Run service or local operator demo.
+- Set `API_BASE_URL` to point to the deployed API.
 
 ## Rollback
-- Redeploy the previous container image tag.
+- Redeploy the previous container image tag:
+```bash
+gcloud run deploy teleops-api --image gcr.io/<project>/teleops-api:<previous-tag>
+```
 
 ## Observability
-- Enable Cloud Run request logs.
+- Enable Cloud Run request logs in GCP Console.
 - Store RCA artifacts and integration events in persistent storage.
+- Monitor `/metrics/overview` endpoint for key performance indicators.
+
+## Common Operations
+
+### LLM Timeout/Failure
+- TeleOps automatically falls back to baseline RCA when the LLM fails (timeout, invalid JSON, network error).
+- No manual intervention needed for RCA availability.
+- Check LLM latency in `/metrics/overview` to diagnose persistent issues.
+- If LLM failures are sustained, verify `GEMINI_API_KEY` and network connectivity.
+
+### RAG Index Rebuild
+```bash
+# SSH into container or run locally
+python -c "from teleops.rag.index import build_index; build_index()"
+```
+- RAG index is built from `docs/rag_corpus/` markdown files.
+- Rebuild is needed after adding new runbook documents.
+
+### Database Reset and Recovery
+```bash
+# Reset all incidents and RCA artifacts (destructive)
+curl -X POST https://<service-url>/reset
+```
+- SQLite database is at `storage/teleops.db`.
+- Back up the file before any destructive operations.
+
+### Health Check Monitoring
+- `GET /health` returns HTTP 200 when the API is running.
+- `GET /incidents` returns HTTP 200 with incident list.
+- `GET /metrics/overview` returns dashboard KPIs.
+
+---
+
+## Cost Estimate (Demo Scale)
+
+Estimates assume a demo workload with low traffic.
+
+| Component | Monthly Cost |
+|-----------|-------------|
+| Cloud Run (API) - 1 vCPU / 512MB, minimal traffic | $10 - $30 |
+| Hosted LLM (Gemini pay-per-token) | $20 - $60 |
+| Storage (SQLite or small managed Postgres) | $5 - $20 |
+| **Total (Demo Scale)** | **$35 - $110** |
+
+Notes:
+- Costs increase linearly with LLM usage and concurrent users.
+- GPU hosting for local LLMs is excluded from this estimate.

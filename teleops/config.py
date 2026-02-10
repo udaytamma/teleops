@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     # RAG
     rag_corpus_dir: str = "./docs/rag_corpus"
     rag_index_dir: str = "./storage/rag_index"
-    rag_top_k: int = 4
+    rag_top_k: int = 6
 
     # Integrations
     integrations_fixtures_dir: str = "./docs/integrations/fixtures"

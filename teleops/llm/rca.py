@@ -130,28 +130,85 @@ def baseline_rca(incident_summary: str, alerts: list[dict[str, Any]] | None = No
     }
 
 
+def _detect_scenario_hint(incident: dict[str, Any], alerts: list[dict[str, Any]]) -> str:
+    """Detect likely scenario type from alerts to provide a hint to the LLM."""
+    search_text = (incident.get("summary", "") or "").lower()
+    for alert in alerts[:20]:
+        search_text += f" {alert.get('alert_type', '')} {alert.get('message', '')}".lower()
+
+    for rule in BASELINE_RULES:
+        matches = sum(1 for p in rule["patterns"] if p in search_text)
+        if matches >= 2:
+            return rule["hypothesis"].split(" ")[0:3]  # First 3 words as hint
+
+    return ""
+
+
 def build_prompt(incident: dict[str, Any], alerts: list[dict[str, Any]], rag_context: list[str]) -> str:
+    # Extract alert types for the scenario hint
+    alert_types = sorted({a.get("alert_type", "") for a in alerts[:20] if a.get("alert_type")})
+    hosts = sorted({a.get("host", "") for a in alerts[:20] if a.get("host")})
+
     prompt = {
         "instruction": (
-            "You are a telecom operations RCA assistant. "
+            "Analyze the incident below and produce a root cause analysis. "
             "Return only valid JSON following the schema below. "
             "Do not wrap the JSON in markdown or code fences. "
             "Output must start with '{' and end with '}' with no surrounding text."
         ),
         "schema": {
-            "incident_summary": "string",
-            "hypotheses": ["string"],
-            "confidence_scores": {"hypothesis": 0.0},
-            "evidence": {"key": "value"},
+            "incident_summary": "string - restate the incident in your own words",
+            "hypotheses": ["string - specific root cause naming components and failure mode"],
+            "confidence_scores": {"hypothesis_text": "float 0.0-1.0"},
+            "evidence": {
+                "alert_signals": "string - which alert types support this hypothesis",
+                "affected_components": "string - specific hosts/links/services affected",
+                "rag_references": "string - relevant context from runbooks",
+            },
             "generated_at": "ISO-8601 timestamp",
-            "model": "string",
+            "model": "string - your model identifier",
         },
+        "few_shot_examples": [
+            {
+                "incident_summary": "DNS resolution failures across region-east",
+                "hypotheses": ["authoritative DNS cluster outage in region-east"],
+                "confidence_scores": {"authoritative DNS cluster outage in region-east": 0.75},
+                "evidence": {
+                    "alert_signals": "dns_timeout (12 alerts), servfail_spike (8 alerts), nx_domain_spike (5 alerts)",
+                    "affected_components": "dns-auth-1, dns-rec-1",
+                    "rag_references": "DNS outage runbook: check SOA records, verify zone transfer status",
+                },
+            },
+            {
+                "incident_summary": "High packet loss on core backbone links",
+                "hypotheses": [
+                    "fiber cut on metro ring segment causing optical link failure",
+                    "link congestion on core-router-1 due to traffic rerouting",
+                ],
+                "confidence_scores": {
+                    "fiber cut on metro ring segment causing optical link failure": 0.65,
+                    "link congestion on core-router-1 due to traffic rerouting": 0.30,
+                },
+                "evidence": {
+                    "alert_signals": "link_down (6 alerts), loss_of_signal (4 alerts), packet_loss (15 alerts)",
+                    "affected_components": "core-router-1, core-router-2, agg-switch-2",
+                    "rag_references": "Fiber cut runbook: check optical power levels, verify DWDM transponder status",
+                },
+            },
+        ],
         "incident": incident,
         "alerts_sample": alerts[:20],
+        "alert_type_summary": alert_types,
+        "affected_hosts": hosts,
         "rag_context": rag_context,
         "constraints": [
             "Do not invent remediation commands.",
             "If uncertain, include lower confidence score.",
+            "Hypotheses must name specific infrastructure components (routers, links, services).",
+            "Evidence must reference specific alert types from the alerts_sample.",
+            "Limit to 1-3 hypotheses, ordered by confidence (highest first).",
+            "Confidence scores must reflect genuine uncertainty -- do not default to 0.5.",
+            "Use the rag_context to ground your analysis in domain-specific knowledge.",
         ],
     }
     return json_dumps(prompt)

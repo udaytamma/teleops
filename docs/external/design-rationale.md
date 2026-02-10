@@ -1,7 +1,5 @@
 # Design Rationale
 
-> Static copy of the former public design rationale page (zeroleaf.dev/nebula/tops-redundant/design-rationale), imported from the local Nebula source on 2026-02-09 and aligned to the current TeleOps implementation.
-
 ## Contents
 1. Correlation Parameters
 2. Scenario Design Decisions
@@ -11,7 +9,6 @@
 6. Confidence Scoring
 7. Data Model Choices
 8. Evaluation Metrics
-9. Interview Application
 
 ---
 
@@ -205,21 +202,4 @@ The evaluation uses cosine similarity over sentence-transformer embeddings. This
 
 ---
 
-## 9. Interview Application
-
-### 2-Minute Response: "How did you decide on those parameter values?"
-"Every parameter in TeleOps is derived from telecom operations reality, not guessed.
-
-For correlation, I started with incident timelines. Network failures cascade within 5-15 minutes; a 15-minute window captures the cascade without merging unrelated incidents. The 10-alert minimum filters transient noise because real incidents generate alert storms, not single alerts. Percentile-based noise filtering further removes low-signal tags.
-
-For LLM parameters, I balanced quality against demo constraints. Sampling 20 alerts gives enough signal without overwhelming the model. JSON-only output enables programmatic parsing and evaluation. The explicit constraint against generating commands is a safety guardrail.
-
-For the baseline RCA, confidence values are set to be above 0.5 but below 0.7 to communicate "probably correct" while leaving room for LLM improvement. The baseline exists for fallback, benchmarking, and deterministic testing.
-
-The point is that parameters are defensible: I can explain why 15 minutes not 10, why 10 alerts not 5, and why 0.55 confidence not 0.6. That traceability is what distinguishes engineering from tinkering."
-
-### 1-Minute Response: "Why rule-based correlation over ML?"
-"For MVP, rule-based correlation is deterministic and explainable without training data. I can tell you exactly why alerts were grouped within a 15-minute window and a 10-alert minimum. ML-based correlation would require labeled data and add probabilistic ambiguity. The architecture keeps the correlator modular so ML can replace it later, but for a capstone, predictable rules prove the RCA value faster."
-
-### 1-Minute Response: "How would you improve evaluation?"
-"Semantic similarity already reduces false negatives. The next step is a rubric-based evaluation where domain experts score RCAs on root cause accuracy, evidence quality, and actionability. This would complement the automated similarity metrics and better reflect operator trust."
+*Every parameter in TeleOps is derived from telecom operations reality: 15-minute correlation windows match incident cascade timelines, 10-alert minimums filter transient noise, and percentile-based filtering adapts to each batch.*

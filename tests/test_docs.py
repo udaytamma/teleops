@@ -10,8 +10,8 @@ def test_required_docs_exist():
         "docs/integrations/README.md",
         "docs/data_dictionary.md",
         "docs/deployment_runbook.md",
-        "docs/cost_estimate.md",
-        "docs/ux_feedback.md",
+        "docs/slis-slos.md",
+        "docs/business-impact.md",
     ]
     for path in required:
         assert Path(path).exists()

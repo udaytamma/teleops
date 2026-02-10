@@ -494,7 +494,15 @@ def generate_llm_rca(
     alerts_dicts = [alert_to_dict(alert, redact=True) for alert in alerts]
 
     alert_types = sorted({alert.alert_type for alert in alerts if alert.alert_type})
-    rag_query = f"{incident.summary} | alerts: {', '.join(alert_types[:5])} | count: {len(alerts)}"
+    hosts = sorted({alert.host for alert in alerts if alert.host})
+    severities = sorted({alert.severity for alert in alerts if alert.severity})
+    rag_query = (
+        f"{incident.summary} | "
+        f"alerts: {', '.join(alert_types[:8])} | "
+        f"hosts: {', '.join(hosts[:5])} | "
+        f"severity: {', '.join(severities)} | "
+        f"count: {len(alerts)}"
+    )
     redacted_rag_query = _redact_obj(rag_query, tenant_id=incident.tenant_id)
     try:
         t0 = time.perf_counter()

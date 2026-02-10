@@ -11,6 +11,19 @@ import httpx
 from teleops.config import settings, logger
 
 
+SYSTEM_PROMPT = (
+    "You are a senior telecom NOC engineer performing root cause analysis. "
+    "You have deep expertise in IP/MPLS networks, BGP routing, DNS infrastructure, "
+    "optical transport, CDN operations, firewall policy, and database performance. "
+    "When analyzing incidents, you must: "
+    "(1) Name specific infrastructure components (routers, links, services, hosts) in your hypotheses. "
+    "(2) Reference specific alert types from the provided alert sample as evidence. "
+    "(3) Provide 1-3 hypotheses ordered by confidence, with scores that reflect genuine uncertainty. "
+    "(4) Never invent remediation commands. "
+    "Return only valid JSON with no markdown fences."
+)
+
+
 class LLMClientError(RuntimeError):
     pass
 
@@ -51,7 +64,7 @@ class OpenAICompatibleClient(BaseLLMClient):
         payload = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": "You are a telecom operations RCA assistant."},
+                {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
             ],
             "temperature": 0.2,
@@ -86,7 +99,7 @@ class GeminiClient(BaseLLMClient):
 
         logger.info(f"Gemini request with model={self.model}, timeout={settings.gemini_timeout_seconds}s")
         genai.configure(api_key=self.api_key)
-        model = genai.GenerativeModel(self.model)
+        model = genai.GenerativeModel(self.model, system_instruction=SYSTEM_PROMPT)
 
         # Configure timeout via generation config
         try:

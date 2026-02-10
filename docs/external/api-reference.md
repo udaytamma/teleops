@@ -1,8 +1,6 @@
 # API Reference
 
-> Static copy of the public TelcoOps API reference (zeroleaf.dev/docs/telcoops/api-reference), imported on 2026-02-09 and adjusted to match the current implementation.
-
-TelcoOps exposes 16 REST endpoints for scenario generation, incident correlation, RCA generation, human review, and observability. The API is designed to be simple enough for a demo UI but structured for future automation.
+TeleOps exposes 16 REST endpoints for scenario generation, incident correlation, RCA generation, human review, and observability. The API is designed to be simple enough for a demo UI but structured for future automation.
 
 ## Base URL
 ```
