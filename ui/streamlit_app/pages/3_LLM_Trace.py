@@ -58,12 +58,17 @@ artifact_resp = requests.get(
 if artifact_resp.status_code == 404:
     st.warning("No LLM RCA found for this incident.")
     if st.button("Run LLM RCA", type="primary"):
-        with st.spinner("Running LLM RCA..."):
-            run_resp = requests.post(f"{API_URL}/rca/{selected['id']}/llm", headers=REQUEST_HEADERS, timeout=60)
-        if run_resp.status_code >= 400:
-            st.error(run_resp.text)
-        else:
-            st.rerun()
+        try:
+            with st.spinner("Running LLM RCA (may take up to 2 minutes)..."):
+                run_resp = requests.post(f"{API_URL}/rca/{selected['id']}/llm", headers=REQUEST_HEADERS, timeout=180)
+            if run_resp.status_code >= 400:
+                st.error(run_resp.text)
+            else:
+                st.rerun()
+        except requests.exceptions.Timeout:
+            st.error("LLM RCA timed out. Gemini API may be slow — please retry.")
+        except requests.exceptions.ConnectionError:
+            st.error("Could not connect to the API. Please check that the backend is running.")
     st.stop()
 elif artifact_resp.status_code >= 400:
     st.error(artifact_resp.text)

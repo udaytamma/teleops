@@ -312,27 +312,37 @@ if incidents:
             run_rca = st.button("Run RCA", type="primary", use_container_width=True)
 
         if run_rca:
-            with st.spinner("Running baseline RCA..."):
-                baseline_resp = requests.post(
-                    f"{API_URL}/rca/{selected['id']}/baseline",
-                    headers=REQUEST_HEADERS,
-                    timeout=30,
-                )
-            if baseline_resp.status_code >= 400:
-                st.error(f"Baseline RCA failed: {baseline_resp.text}")
-            else:
-                st.session_state["baseline_rca"] = baseline_resp.json()
+            try:
+                with st.spinner("Running baseline RCA..."):
+                    baseline_resp = requests.post(
+                        f"{API_URL}/rca/{selected['id']}/baseline",
+                        headers=REQUEST_HEADERS,
+                        timeout=60,
+                    )
+                if baseline_resp.status_code >= 400:
+                    st.error(f"Baseline RCA failed: {baseline_resp.text}")
+                else:
+                    st.session_state["baseline_rca"] = baseline_resp.json()
+            except requests.exceptions.Timeout:
+                st.error("Baseline RCA timed out. The API may be under heavy load — please retry.")
+            except requests.exceptions.ConnectionError:
+                st.error("Could not connect to the API. Please check that the backend is running.")
 
-            with st.spinner("Running LLM RCA..."):
-                llm_resp = requests.post(
-                    f"{API_URL}/rca/{selected['id']}/llm",
-                    headers=REQUEST_HEADERS,
-                    timeout=60,
-                )
-            if llm_resp.status_code >= 400:
-                st.error(f"LLM RCA failed: {llm_resp.text}")
-            else:
-                st.session_state["llm_rca"] = llm_resp.json()
+            try:
+                with st.spinner("Running LLM RCA (may take up to 2 minutes)..."):
+                    llm_resp = requests.post(
+                        f"{API_URL}/rca/{selected['id']}/llm",
+                        headers=REQUEST_HEADERS,
+                        timeout=180,
+                    )
+                if llm_resp.status_code >= 400:
+                    st.error(f"LLM RCA failed: {llm_resp.text}")
+                else:
+                    st.session_state["llm_rca"] = llm_resp.json()
+            except requests.exceptions.Timeout:
+                st.error("LLM RCA timed out. Gemini API may be slow — please retry.")
+            except requests.exceptions.ConnectionError:
+                st.error("Could not connect to the API. Please check that the backend is running.")
     else:
         empty_state("No incidents match filters", "")
 else:
