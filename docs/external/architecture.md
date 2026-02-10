@@ -48,7 +48,7 @@ Noise filtering is percentile-based: tags at or below the 25th percentile of ale
 FastAPI orchestrates the workflow: generating scenarios, correlating incidents, and launching RCA generation. The API provides a simple contract for UI integration and future automation.
 
 ## AI Plane
-The AI plane combines a deterministic baseline (11 pattern-matching rules) with LLM reasoning. LLM requests include a structured incident payload, up to 20 alert samples, and top-4 RAG context chunks retrieved from 14 runbooks. The response is validated for JSON structure before persistence. Duration is tracked via `duration_ms` on each artifact.
+The AI plane combines a deterministic baseline (11 pattern-matching rules) with LLM reasoning. LLM requests include a structured incident payload, up to 20 alert samples, and top-6 RAG context chunks retrieved from 14 runbooks. The response is validated for JSON structure before persistence. Duration is tracked via `duration_ms` on each artifact.
 
 ## Review Plane
 All RCA artifacts default to `pending_review` status. The review plane provides accept/reject endpoints with required reviewer identification and optional notes. Every review decision is appended to `storage/audit_log.jsonl` for immutable audit trail. The Observability dashboard surfaces review acceptance rates and decision quality metrics.

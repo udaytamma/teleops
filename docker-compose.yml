@@ -10,7 +10,7 @@ services:
       - LLM_PROVIDER=gemini
       - LLM_MODEL=gemini-2.0-flash
       - LOG_LEVEL=INFO
-      - DATABASE_URL=sqlite:///./teleops.db
+      - DATABASE_URL=sqlite:///./storage/teleops.db
       - CORS_ORIGINS=["http://localhost:8501"]
     volumes:
       - ./storage:/app/storage

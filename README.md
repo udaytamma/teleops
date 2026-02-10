@@ -157,7 +157,7 @@ teleops/
 | `LLM_PROVIDER` | `gemini` or `local_telellm` | `gemini` |
 | `LLM_TIMEOUT_SECONDS` | LLM request timeout | `60` |
 | `RAG_CORPUS_DIR` | Runbook directory | `./docs/rag_corpus` |
-| `RAG_TOP_K` | Retrieved context chunks | `4` |
+| `RAG_TOP_K` | Retrieved context chunks | `6` |
 | `LOG_FORMAT` | `json` or `text` | `json` |
 | `API_TOKEN` | API token for read/write endpoints | optional |
 | `ADMIN_TOKEN` | Admin token for destructive actions | optional |

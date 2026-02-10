@@ -131,23 +131,34 @@ def baseline_rca(incident_summary: str, alerts: list[dict[str, Any]] | None = No
 
 
 def _detect_scenario_hint(incident: dict[str, Any], alerts: list[dict[str, Any]]) -> str:
-    """Detect likely scenario type from alerts to provide a hint to the LLM."""
+    """Detect likely scenario type from alerts to provide a hint to the LLM.
+
+    Uses the same pattern-matching rules as the baseline RCA to identify the
+    most likely scenario type. Returns a short hint string for the LLM prompt.
+    """
     search_text = (incident.get("summary", "") or "").lower()
     for alert in alerts[:20]:
         search_text += f" {alert.get('alert_type', '')} {alert.get('message', '')}".lower()
 
+    best_rule = None
+    best_matches = 0
     for rule in BASELINE_RULES:
         matches = sum(1 for p in rule["patterns"] if p in search_text)
-        if matches >= 2:
-            return rule["hypothesis"].split(" ")[0:3]  # First 3 words as hint
+        if matches > best_matches:
+            best_matches = matches
+            best_rule = rule
+
+    if best_rule and best_matches >= 2:
+        return best_rule["hypothesis"]
 
     return ""
 
 
 def build_prompt(incident: dict[str, Any], alerts: list[dict[str, Any]], rag_context: list[str]) -> str:
-    # Extract alert types for the scenario hint
+    # Extract alert types and detect scenario hint from baseline pattern matching
     alert_types = sorted({a.get("alert_type", "") for a in alerts[:20] if a.get("alert_type")})
     hosts = sorted({a.get("host", "") for a in alerts[:20] if a.get("host")})
+    scenario_hint = _detect_scenario_hint(incident, alerts)
 
     prompt = {
         "instruction": (
@@ -196,6 +207,7 @@ def build_prompt(incident: dict[str, Any], alerts: list[dict[str, Any]], rag_con
                 },
             },
         ],
+        "scenario_hint": scenario_hint if scenario_hint else "No strong pattern match -- analyze alerts independently",
         "incident": incident,
         "alerts_sample": alerts[:20],
         "alert_type_summary": alert_types,

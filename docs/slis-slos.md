@@ -9,7 +9,7 @@
 TeleOps uses a two-tier RCA architecture:
 
 - **Baseline RCA** is deterministic, rule-based, and always available. It executes in sub-millisecond time and serves as the guaranteed fallback for every incident. This is the reliability floor.
-- **LLM RCA** is RAG-enhanced (Gemini + Qdrant) and provides deeper, context-aware analysis. It is inherently best-effort due to external API dependencies, variable latency, and potential for malformed output.
+- **LLM RCA** is RAG-enhanced (Gemini + LlamaIndex with HuggingFace embeddings) and provides deeper, context-aware analysis. It is inherently best-effort due to external API dependencies, variable latency, and potential for malformed output.
 
 The SLO framework reflects this: baseline availability is the non-negotiable foundation, while LLM quality and latency targets are aspirational and designed to degrade gracefully. If the LLM path fails, operators still receive a valid RCA from the baseline path.
 

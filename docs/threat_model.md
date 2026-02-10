@@ -14,7 +14,7 @@
 | Audit trail | JSONL files (`storage/audit_log.jsonl`) | Compliance -- review decisions, reviewer identity |
 | Integration events | JSONL files (`storage/integration_events.jsonl`) | Internal -- webhook payloads |
 | API tokens (api_token, admin_token, metrics_token) | Environment variables | Secret |
-| Tenant identifiers | Request headers, aliased in storage | Internal -- hashed before persistence |
+| Tenant identifiers | Request headers | Internal -- hashed in LLM-bound content via redaction; stored plaintext in DB for query performance |
 
 ---
 
@@ -26,7 +26,7 @@
 |--------|------|-------------------|---------------|--------------------------|
 | Unauthenticated API access | **High** | Token auth via `X-API-Key` or `Bearer` header, but tokens are optional -- when `API_TOKEN` env var is unset, all endpoints are open | In demo mode, any network-reachable client can read/write all data | Enforce token auth in production (`API_TOKEN` and `ADMIN_TOKEN` must be set). Fail closed: reject requests when tokens are not configured. |
 | No per-user identity | **Medium** | Single shared `api_token` for all read/write users; single shared `admin_token` for destructive operations. No user-level authentication. | Cannot attribute actions to individual operators. Shared token compromise affects all users. | Integrate with an identity provider (OAuth2/OIDC). Issue per-user tokens with claims. |
-| Tenant spoofing via header | **Medium** | `X-Tenant-Id` header is required when `REQUIRE_TENANT_ID=true`. Tenant IDs are hashed to aliases before storage. | Callers can supply arbitrary tenant IDs -- no validation that the caller belongs to the claimed tenant. | Bind tenant identity to authenticated user tokens. Validate tenant membership server-side. |
+| Tenant spoofing via header | **Medium** | `X-Tenant-Id` header is required when `REQUIRE_TENANT_ID=true`. Tenant IDs are hashed to aliases in redacted content sent to the LLM, but stored in plaintext in the database for query filtering. | Callers can supply arbitrary tenant IDs -- no validation that the caller belongs to the claimed tenant. | Bind tenant identity to authenticated user tokens. Validate tenant membership server-side. |
 | Streamlit dashboard has no auth | **Low** | Dashboard is read-only in demo mode. No login required. | Anyone with network access can view incident data and RCA results. | Add authentication to the dashboard (Streamlit auth, reverse proxy, or SSO) for non-demo deployments. |
 
 ### T -- Tampering

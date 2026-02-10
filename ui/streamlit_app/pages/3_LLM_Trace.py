@@ -66,7 +66,7 @@ if artifact_resp.status_code == 404:
             else:
                 st.rerun()
         except requests.exceptions.Timeout:
-            st.error("LLM RCA timed out. Gemini API may be slow — please retry.")
+            st.error("LLM RCA timed out. Gemini API may be slow -- please retry.")
         except requests.exceptions.ConnectionError:
             st.error("Could not connect to the API. Please check that the backend is running.")
     st.stop()
@@ -76,8 +76,13 @@ elif artifact_resp.status_code >= 400:
 
 artifact = artifact_resp.json()
 evidence = artifact.get("evidence", {})
+
+# Support both new format (llm_request/llm_response) and legacy format (flat fields)
 llm_request = evidence.get("llm_request", {})
 llm_response = evidence.get("llm_response", {})
+rag_query = evidence.get("rag_query", "N/A")
+alerts_count = evidence.get("alerts_count", 0)
+rag_chunks_used = evidence.get("rag_chunks_used", 0)
 
 left, right = st.columns(2, gap="large")
 
@@ -92,30 +97,48 @@ with left:
         unsafe_allow_html=True,
     )
 
-    st.markdown("**Incident Context**")
-    st.json(llm_request.get("incident", {}))
+    # RAG query used for retrieval
+    st.markdown("**RAG Query**")
+    st.code(rag_query if isinstance(rag_query, str) else str(rag_query), language=None)
+
+    st.caption(f"Alerts analyzed: **{alerts_count}** | RAG chunks used: **{rag_chunks_used}**")
 
     divider()
 
-    st.markdown("**Alerts Sample**")
-    alerts = llm_request.get("alerts_sample", [])
-    if alerts:
-        st.json(alerts[:5])
-        if len(alerts) > 5:
-            st.caption(f"+ {len(alerts) - 5} more alerts")
-    else:
-        st.markdown("<p style='color: var(--ink-dim);'>No alerts recorded</p>", unsafe_allow_html=True)
+    if llm_request:
+        # New format: full request payload available
+        st.markdown("**Incident Context**")
+        st.json(llm_request.get("incident", {}))
 
-    divider()
+        divider()
 
-    st.markdown("**RAG Context**")
-    rag = llm_request.get("rag_context", [])
-    if rag:
-        for idx, chunk in enumerate(rag, 1):
-            st.markdown(f"**Chunk {idx}:**")
-            st.markdown(f"<div style='background: var(--bg); padding: 12px; border-radius: 8px; font-size: 13px; color: var(--ink-muted); margin-bottom: 8px;'>{chunk[:300]}{'...' if len(chunk) > 300 else ''}</div>", unsafe_allow_html=True)
+        st.markdown("**Alerts Sample**")
+        alerts = llm_request.get("alerts_sample", [])
+        if alerts:
+            st.json(alerts[:5])
+            if len(alerts) > 5:
+                st.caption(f"+ {len(alerts) - 5} more alerts")
+        else:
+            st.markdown("<p style='color: var(--ink-dim);'>No alerts recorded</p>", unsafe_allow_html=True)
+
+        divider()
+
+        st.markdown("**RAG Context**")
+        rag = llm_request.get("rag_context", [])
+        if rag:
+            for idx, chunk in enumerate(rag if isinstance(rag, list) else [rag], 1):
+                st.markdown(f"**Chunk {idx}:**")
+                chunk_text = chunk[:300] if isinstance(chunk, str) else str(chunk)[:300]
+                st.markdown(f"<div style='background: var(--bg); padding: 12px; border-radius: 8px; font-size: 13px; color: var(--ink-muted); margin-bottom: 8px;'>{chunk_text}{'...' if len(str(chunk)) > 300 else ''}</div>", unsafe_allow_html=True)
+        else:
+            st.markdown("<p style='color: var(--ink-dim);'>No RAG context</p>", unsafe_allow_html=True)
     else:
-        st.markdown("<p style='color: var(--ink-dim);'>No RAG context</p>", unsafe_allow_html=True)
+        # Legacy format: only flat evidence fields available
+        st.info("Detailed request payload not captured for this artifact. Showing summary fields only.")
+        llm_evidence = evidence.get("llm_evidence", {})
+        if llm_evidence:
+            st.markdown("**LLM Evidence**")
+            st.json(llm_evidence)
 
 with right:
     st.markdown(
@@ -135,5 +158,18 @@ with right:
         st.markdown(f"{badge(artifact.get('model', 'unknown'), 'accent')} &nbsp; {badge(artifact.get('generated_at', '')[:19], 'muted')}", unsafe_allow_html=True)
         st.write("")
         st.json(llm_response)
+    elif artifact.get("hypotheses"):
+        # Fallback: show hypotheses from the artifact directly
+        st.markdown(f"{badge(artifact.get('model', 'unknown'), 'accent')} &nbsp; {badge(artifact.get('generated_at', '')[:19], 'muted')}", unsafe_allow_html=True)
+        st.write("")
+        st.markdown("**Hypotheses**")
+        st.json(artifact["hypotheses"])
+        if artifact.get("confidence_scores"):
+            st.markdown("**Confidence Scores**")
+            st.json(artifact["confidence_scores"])
     else:
         st.markdown("<p style='color: var(--ink-dim); text-align: center; padding: 20px;'>No response recorded</p>", unsafe_allow_html=True)
+
+# Raw evidence expander for debugging
+with st.expander("Raw Evidence JSON"):
+    st.json(evidence)

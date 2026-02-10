@@ -519,12 +519,18 @@ def generate_llm_rca(
         logger.error(f"LLM/RAG error for incident {incident_id}: {exc}")
         raise HTTPException(status_code=502, detail=f"LLM/RAG error: {exc}") from exc
 
-    # Store minimal fields needed for evaluation and traceability (not full payloads)
+    # Store evidence for evaluation, traceability, and LLM Trace UI
     artifact = RCAArtifact(
         incident_id=incident.id,
         hypotheses=result.get("hypotheses", []),
         evidence=_redact_obj(
             {
+                "llm_request": {
+                    "incident": incident_dict,
+                    "alerts_sample": alerts_dicts[:20],
+                    "rag_context": redacted_rag_context,
+                },
+                "llm_response": result,
                 "llm_evidence": result.get("evidence", {}),
                 "rag_query": redacted_rag_query,
                 "alerts_count": len(alerts_dicts),
@@ -714,6 +720,13 @@ def review_rca_artifact(
     artifact = db.query(RCAArtifact).filter(RCAArtifact.id == artifact_id).first()
     if not artifact:
         raise HTTPException(status_code=404, detail="RCA artifact not found")
+
+    # Prevent re-review: each artifact can only be reviewed once
+    if artifact.status != "pending_review":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Artifact already reviewed with decision: {artifact.status}",
+        )
 
     # Enforce tenant isolation via the artifact's parent incident
     if tenant_id:
