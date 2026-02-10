@@ -1,12 +1,11 @@
 from pathlib import Path
 
+from scripts import import_logs
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from teleops.models import Base, Alert
-
-from scripts import import_logs
+from teleops.models import Alert, Base
 
 
 def test_import_logs_inserts_records(tmp_path, monkeypatch):
@@ -17,10 +16,10 @@ def test_import_logs_inserts_records(tmp_path, monkeypatch):
         poolclass=StaticPool,
     )
     Base.metadata.create_all(bind=engine)
-    TestingSession = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+    testing_session_factory = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
     def _session_factory():
-        return TestingSession()
+        return testing_session_factory()
 
     monkeypatch.setattr(import_logs, "SessionLocal", _session_factory)
 
@@ -28,7 +27,7 @@ def test_import_logs_inserts_records(tmp_path, monkeypatch):
     records = import_logs._load_records(sample_file)
     inserted = import_logs._import_records(records, dry_run=False)
 
-    session = TestingSession()
+    session = testing_session_factory()
     try:
         count = session.query(Alert).count()
     finally:

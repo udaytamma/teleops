@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from teleops.api.app import app, get_db
 from teleops.models import Base
@@ -14,11 +14,11 @@ def test_generate_and_list_incidents():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    TestingSession = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+    testing_session_factory = sessionmaker(bind=engine, autocommit=False, autoflush=False)
     Base.metadata.create_all(bind=engine)
 
     def override_get_db():
-        db = TestingSession()
+        db = testing_session_factory()
         try:
             yield db
         finally:
