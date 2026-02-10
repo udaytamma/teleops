@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from scripts import import_logs
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from scripts import import_logs
 from teleops.models import Alert, Base
 
 
