@@ -9,9 +9,9 @@
 
 ## Data Flow
 1) Generate synthetic alerts via configurable scenario builder.
-2) Correlate alerts into incidents using tag-based grouping.
-3) Run baseline RCA (pattern matching, &lt;10ms).
-4) Run LLM RCA with RAG context (Gemini 2.0 Flash, ~2s).
+2) Correlate alerts into incidents using tag-based grouping with percentile-based noise filtering (drop tags at or below p25 of alert counts per batch).
+3) Run baseline RCA (pattern matching; p50 0.107ms, p90 0.185ms on local macOS arm64; see `storage/benchmarks/rca_latency.json`).
+4) Run LLM RCA with RAG context (Gemini 2.0 Flash; p50 3150ms, p90 3912ms on local macOS arm64; see `storage/benchmarks/rca_latency.json`).
 5) **Human reviews and accepts/rejects hypothesis** (process gate; API supports status filtering but does not enforce acceptance by default).
 6) Display comparison results with timing and confidence metrics.
 7) Audit trail captures all review decisions.
@@ -36,7 +36,7 @@ Fully autonomous RCA is dangerous in telecom operations. A wrong hypothesis acte
 |------|-----------|----------------|-----------|
 | Alert ingestion | Yes | No | Standard data pipeline, deterministic |
 | Alert correlation | Yes | No | Tag-based grouping, no judgment needed |
-| Noise filtering | Yes | No | Statistical threshold, reversible |
+| Noise filtering | Yes | No | Percentile threshold: tags at or below p25 of alert counts per batch are dropped (after `min_alerts` guardrail). |
 | Baseline RCA generation | Yes | No | Pattern matching against known rules |
 | LLM RCA generation | Yes | No | AI hypothesis generation |
 | **RCA hypothesis acceptance** | **No** | **Yes** | Human validates AI output before action |

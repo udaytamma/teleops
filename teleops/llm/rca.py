@@ -135,7 +135,8 @@ def build_prompt(incident: dict[str, Any], alerts: list[dict[str, Any]], rag_con
         "instruction": (
             "You are a telecom operations RCA assistant. "
             "Return only valid JSON following the schema below. "
-            "Do not wrap the JSON in markdown or code fences."
+            "Do not wrap the JSON in markdown or code fences. "
+            "Output must start with '{' and end with '}' with no surrounding text."
         ),
         "schema": {
             "incident_summary": "string",

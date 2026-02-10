@@ -1,8 +1,8 @@
 {
   "baseline_avg": 0.894,
   "baseline_median": 0.902,
-  "llm_avg": null,
-  "llm_median": null,
+  "llm_avg": 0.658,
+  "llm_median": 0.675,
   "runs": 50,
   "scoring_method": "semantic_cosine_similarity",
   "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
@@ -22,7 +22,16 @@
       "total_attempted": 50,
       "total_correct": 50
     },
-    "llm": null
+    "llm": {
+      "precision": 0.16,
+      "recall": 0.16,
+      "wrong_but_confident_rate": 0.16,
+      "wrong_but_confident_count": 8,
+      "avg_confidence_correct": 0.737,
+      "avg_confidence_incorrect": 0.738,
+      "total_attempted": 50,
+      "total_correct": 8
+    }
   },
   "per_scenario": [
     {
@@ -32,9 +41,9 @@
       "baseline_hypothesis": "link congestion on core-router-1 causing packet loss",
       "baseline_score": 1.0,
       "baseline_confidence": 0.55,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Congestion on core routers is causing packet loss and latency spikes.",
+      "llm_score": 0.81,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "dns_outage",
@@ -43,9 +52,9 @@
       "baseline_hypothesis": "authoritative DNS cluster outage in region-east",
       "baseline_score": 1.0,
       "baseline_confidence": 0.6,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Resolver Overload: High query rates or resource exhaustion on DNS resolvers are causing timeouts and failures.",
+      "llm_score": 0.511,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "bgp_flap",
@@ -54,9 +63,9 @@
       "baseline_hypothesis": "unstable BGP session with upstream AS causing route flaps",
       "baseline_score": 0.774,
       "baseline_confidence": 0.58,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "BGP session flapping due to network congestion causing hold timer expiry.",
+      "llm_score": 0.616,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "fiber_cut",
@@ -65,9 +74,9 @@
       "baseline_hypothesis": "fiber cut on metro ring segment causing optical link failure",
       "baseline_score": 0.803,
       "baseline_confidence": 0.65,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Fiber cut is impacting multiple optical links, causing loss of signal and link down alerts across different devices.",
+      "llm_score": 0.439,
+      "llm_confidence": 0.8
     },
     {
       "scenario_type": "router_freeze",
@@ -76,9 +85,9 @@
       "baseline_hypothesis": "control plane freeze on core router causing forwarding issues",
       "baseline_score": 0.902,
       "baseline_confidence": 0.55,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "The router is experiencing a control plane overload due to high traffic or processing demands.",
+      "llm_score": 0.698,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "isp_peering_congestion",
@@ -87,9 +96,9 @@
       "baseline_hypothesis": "congestion on ISP peering link causing packet loss",
       "baseline_score": 0.812,
       "baseline_confidence": 0.57,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Transit congestion on peering links is causing high latency and packet loss.",
+      "llm_score": 0.65,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "ddos_edge",
@@ -98,9 +107,9 @@
       "baseline_hypothesis": "volumetric DDoS attack targeting edge infrastructure",
       "baseline_score": 0.824,
       "baseline_confidence": 0.7,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "The edge network is under a volumetric DDoS attack, overwhelming edge routers and scrubbing infrastructure.",
+      "llm_score": 0.764,
+      "llm_confidence": 0.8
     },
     {
       "scenario_type": "mpls_vpn_leak",
@@ -109,9 +118,9 @@
       "baseline_hypothesis": "VRF misconfiguration causing MPLS/L3VPN route leak",
       "baseline_score": 1.0,
       "baseline_confidence": 0.52,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "VRF route leak due to misconfiguration of route target (RT) import/export policies on pe-core-1 and pe-core-2.",
+      "llm_score": 0.667,
+      "llm_confidence": 0.8
     },
     {
       "scenario_type": "cdn_cache_stampede",
@@ -120,9 +129,9 @@
       "baseline_hypothesis": "CDN cache stampede due to TTL misconfiguration",
       "baseline_score": 0.984,
       "baseline_confidence": 0.58,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Cache stampede is occurring due to a sudden surge in requests for content that is not cached or has expired TTL, overwhelming the origin servers.",
+      "llm_score": 0.681,
+      "llm_confidence": 0.75
     },
     {
       "scenario_type": "firewall_rule_misconfig",
@@ -131,9 +140,9 @@
       "baseline_hypothesis": "firewall rule misconfiguration blocking critical traffic",
       "baseline_score": 0.847,
       "baseline_confidence": 0.62,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "A firewall rule was misconfigured, leading to legitimate traffic being blocked.",
+      "llm_score": 0.716,
+      "llm_confidence": 0.8
     },
     {
       "scenario_type": "database_latency_spike",
@@ -142,9 +151,9 @@
       "baseline_hypothesis": "database contention causing latency spike on hosted applications",
       "baseline_score": 0.904,
       "baseline_confidence": 0.55,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Database contention due to long-running queries or lock waits is causing the latency spike.",
+      "llm_score": 0.742,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "network_degradation",
@@ -153,9 +162,9 @@
       "baseline_hypothesis": "link congestion on core-router-1 causing packet loss",
       "baseline_score": 1.0,
       "baseline_confidence": 0.55,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Congestion on core routers is causing packet loss and high latency.",
+      "llm_score": 0.83,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "dns_outage",
@@ -164,9 +173,9 @@
       "baseline_hypothesis": "authoritative DNS cluster outage in region-east",
       "baseline_score": 1.0,
       "baseline_confidence": 0.6,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Resolver Overload: High CPU utilization or query rates on DNS resolvers are causing timeouts and failures.",
+      "llm_score": 0.484,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "bgp_flap",
@@ -175,9 +184,9 @@
       "baseline_hypothesis": "unstable BGP session with upstream AS causing route flaps",
       "baseline_score": 0.774,
       "baseline_confidence": 0.58,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "BGP session flapping due to network congestion between core-router-1 and core-router-2.",
+      "llm_score": 0.571,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "fiber_cut",
@@ -186,9 +195,9 @@
       "baseline_hypothesis": "fiber cut on metro ring segment causing optical link failure",
       "baseline_score": 0.803,
       "baseline_confidence": 0.65,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "A fiber cut has occurred, causing loss of signal and link down events across multiple devices.",
+      "llm_score": 0.47,
+      "llm_confidence": 0.8
     },
     {
       "scenario_type": "router_freeze",
@@ -197,9 +206,9 @@
       "baseline_hypothesis": "control plane freeze on core router causing forwarding issues",
       "baseline_score": 0.902,
       "baseline_confidence": 0.55,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "The router is experiencing a control plane overload due to high traffic or processing demands.",
+      "llm_score": 0.698,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "isp_peering_congestion",
@@ -208,9 +217,9 @@
       "baseline_hypothesis": "congestion on ISP peering link causing packet loss",
       "baseline_score": 0.812,
       "baseline_confidence": 0.57,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Transit link saturation between the ISP and peering edges is causing congestion.",
+      "llm_score": 0.749,
+      "llm_confidence": 0.75
     },
     {
       "scenario_type": "ddos_edge",
@@ -219,9 +228,9 @@
       "baseline_hypothesis": "volumetric DDoS attack targeting edge infrastructure",
       "baseline_score": 0.824,
       "baseline_confidence": 0.7,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Volumetric DDoS attack is overwhelming the edge infrastructure.",
+      "llm_score": 0.793,
+      "llm_confidence": 0.85
     },
     {
       "scenario_type": "mpls_vpn_leak",
@@ -230,9 +239,9 @@
       "baseline_hypothesis": "VRF misconfiguration causing MPLS/L3VPN route leak",
       "baseline_score": 1.0,
       "baseline_confidence": 0.52,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "VRF route leak due to misconfiguration of route target (RT) import/export policies.",
+      "llm_score": 0.679,
+      "llm_confidence": 0.75
     },
     {
       "scenario_type": "cdn_cache_stampede",
@@ -241,9 +250,9 @@
       "baseline_hypothesis": "CDN cache stampede due to TTL misconfiguration",
       "baseline_score": 0.984,
       "baseline_confidence": 0.58,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Cache stampede is occurring due to a sudden surge in requests for content that is not present in the cache, possibly due to TTL expiry or a cold cache after a restart.",
+      "llm_score": 0.664,
+      "llm_confidence": 0.75
     },
     {
       "scenario_type": "firewall_rule_misconfig",
@@ -252,9 +261,9 @@
       "baseline_hypothesis": "firewall rule misconfiguration blocking critical traffic",
       "baseline_score": 0.847,
       "baseline_confidence": 0.62,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "A recent change to firewall rules has inadvertently blocked legitimate traffic.",
+      "llm_score": 0.653,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "database_latency_spike",
@@ -263,9 +272,9 @@
       "baseline_hypothesis": "database contention causing latency spike on hosted applications",
       "baseline_score": 0.904,
       "baseline_confidence": 0.55,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Database contention due to long-running queries or lock waits is causing the latency spike.",
+      "llm_score": 0.745,
+      "llm_confidence": 0.75
     },
     {
       "scenario_type": "network_degradation",
@@ -274,9 +283,9 @@
       "baseline_hypothesis": "link congestion on core-router-1 causing packet loss",
       "baseline_score": 1.0,
       "baseline_confidence": 0.55,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Congestion on core routers is causing packet loss and high latency.",
+      "llm_score": 0.83,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "dns_outage",
@@ -285,9 +294,9 @@
       "baseline_hypothesis": "authoritative DNS cluster outage in region-east",
       "baseline_score": 1.0,
       "baseline_confidence": 0.6,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Resolver Overload: High CPU utilization or query rates on resolver nodes are causing timeouts and failures.",
+      "llm_score": 0.545,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "bgp_flap",
@@ -296,9 +305,9 @@
       "baseline_hypothesis": "unstable BGP session with upstream AS causing route flaps",
       "baseline_score": 0.774,
       "baseline_confidence": 0.58,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "BGP session flapping due to network congestion causing hold timer expiry.",
+      "llm_score": 0.607,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "fiber_cut",
@@ -307,9 +316,9 @@
       "baseline_hypothesis": "fiber cut on metro ring segment causing optical link failure",
       "baseline_score": 0.803,
       "baseline_confidence": 0.65,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Fiber cut is impacting multiple devices.",
+      "llm_score": 0.552,
+      "llm_confidence": 0.8
     },
     {
       "scenario_type": "router_freeze",
@@ -318,9 +327,9 @@
       "baseline_hypothesis": "control plane freeze on core router causing forwarding issues",
       "baseline_score": 0.902,
       "baseline_confidence": 0.55,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "The router's control plane is overloaded, leading to a stall and CPU spikes.",
+      "llm_score": 0.698,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "isp_peering_congestion",
@@ -329,9 +338,9 @@
       "baseline_hypothesis": "congestion on ISP peering link causing packet loss",
       "baseline_score": 0.812,
       "baseline_confidence": 0.57,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Transit link saturation is causing congestion on peering edges.",
+      "llm_score": 0.648,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "ddos_edge",
@@ -340,9 +349,9 @@
       "baseline_hypothesis": "volumetric DDoS attack targeting edge infrastructure",
       "baseline_score": 0.824,
       "baseline_confidence": 0.7,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "The incident is caused by a volumetric DDoS attack overwhelming the edge routers.",
+      "llm_score": 0.741,
+      "llm_confidence": 0.8
     },
     {
       "scenario_type": "mpls_vpn_leak",
@@ -351,9 +360,9 @@
       "baseline_hypothesis": "VRF misconfiguration causing MPLS/L3VPN route leak",
       "baseline_score": 1.0,
       "baseline_confidence": 0.52,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "VRF route leak due to misconfiguration of route target (RT) import/export policies.",
+      "llm_score": 0.679,
+      "llm_confidence": 0.75
     },
     {
       "scenario_type": "cdn_cache_stampede",
@@ -362,9 +371,9 @@
       "baseline_hypothesis": "CDN cache stampede due to TTL misconfiguration",
       "baseline_score": 0.984,
       "baseline_confidence": 0.58,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Popular content TTL expiry causing origin flood.",
+      "llm_score": 0.423,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "firewall_rule_misconfig",
@@ -373,9 +382,9 @@
       "baseline_hypothesis": "firewall rule misconfiguration blocking critical traffic",
       "baseline_score": 0.847,
       "baseline_confidence": 0.62,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Firewall rule was misconfigured, blocking legitimate traffic.",
+      "llm_score": 0.731,
+      "llm_confidence": 0.8
     },
     {
       "scenario_type": "database_latency_spike",
@@ -384,9 +393,9 @@
       "baseline_hypothesis": "database contention causing latency spike on hosted applications",
       "baseline_score": 0.904,
       "baseline_confidence": 0.55,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Database contention is causing the latency spike due to long-running queries, lock waits, or connection pool exhaustion.",
+      "llm_score": 0.745,
+      "llm_confidence": 0.75
     },
     {
       "scenario_type": "network_degradation",
@@ -395,9 +404,9 @@
       "baseline_hypothesis": "link congestion on core-router-1 causing packet loss",
       "baseline_score": 1.0,
       "baseline_confidence": 0.55,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Link congestion on core routers is causing packet loss and high latency.",
+      "llm_score": 0.896,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "dns_outage",
@@ -406,9 +415,9 @@
       "baseline_hypothesis": "authoritative DNS cluster outage in region-east",
       "baseline_score": 1.0,
       "baseline_confidence": 0.6,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Resolver overload is causing DNS timeouts and SERVFAIL errors.",
+      "llm_score": 0.48,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "bgp_flap",
@@ -417,9 +426,9 @@
       "baseline_hypothesis": "unstable BGP session with upstream AS causing route flaps",
       "baseline_score": 0.774,
       "baseline_confidence": 0.58,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "BGP session flapping is caused by network congestion leading to hold timer expiry.",
+      "llm_score": 0.601,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "fiber_cut",
@@ -428,9 +437,9 @@
       "baseline_hypothesis": "fiber cut on metro ring segment causing optical link failure",
       "baseline_score": 0.803,
       "baseline_confidence": 0.65,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Fiber cut is impacting multiple optical links, causing loss of signal and link down events.",
+      "llm_score": 0.488,
+      "llm_confidence": 0.8
     },
     {
       "scenario_type": "router_freeze",
@@ -439,9 +448,9 @@
       "baseline_hypothesis": "control plane freeze on core router causing forwarding issues",
       "baseline_score": 0.902,
       "baseline_confidence": 0.55,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "The router is experiencing a control plane overload due to high traffic or processing demands.",
+      "llm_score": 0.67,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "isp_peering_congestion",
@@ -450,9 +459,9 @@
       "baseline_hypothesis": "congestion on ISP peering link causing packet loss",
       "baseline_score": 0.812,
       "baseline_confidence": 0.57,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Transit congestion on peering links is causing high latency and packet loss.",
+      "llm_score": 0.65,
+      "llm_confidence": 0.75
     },
     {
       "scenario_type": "ddos_edge",
@@ -461,9 +470,9 @@
       "baseline_hypothesis": "volumetric DDoS attack targeting edge infrastructure",
       "baseline_score": 0.824,
       "baseline_confidence": 0.7,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "The incident is caused by a volumetric DDoS attack targeting edge-router-3, with scrubbing-1 also affected as it attempts to mitigate the attack.",
+      "llm_score": 0.655,
+      "llm_confidence": 0.8
     },
     {
       "scenario_type": "mpls_vpn_leak",
@@ -472,9 +481,9 @@
       "baseline_hypothesis": "VRF misconfiguration causing MPLS/L3VPN route leak",
       "baseline_score": 1.0,
       "baseline_confidence": 0.52,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "VRF route leak due to misconfiguration of route target (RT) import/export policies.",
+      "llm_score": 0.679,
+      "llm_confidence": 0.75
     },
     {
       "scenario_type": "cdn_cache_stampede",
@@ -483,9 +492,9 @@
       "baseline_hypothesis": "CDN cache stampede due to TTL misconfiguration",
       "baseline_score": 0.984,
       "baseline_confidence": 0.58,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "A sudden surge in requests for specific content is overwhelming the CDN cache, leading to a cache stampede.",
+      "llm_score": 0.658,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "firewall_rule_misconfig",
@@ -494,9 +503,9 @@
       "baseline_hypothesis": "firewall rule misconfiguration blocking critical traffic",
       "baseline_score": 0.847,
       "baseline_confidence": 0.62,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "A firewall rule has been misconfigured, leading to legitimate traffic being blocked.",
+      "llm_score": 0.728,
+      "llm_confidence": 0.8
     },
     {
       "scenario_type": "database_latency_spike",
@@ -505,9 +514,9 @@
       "baseline_hypothesis": "database contention causing latency spike on hosted applications",
       "baseline_score": 0.904,
       "baseline_confidence": 0.55,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Database contention due to long-running queries or insufficient resources is causing the latency spike.",
+      "llm_score": 0.756,
+      "llm_confidence": 0.75
     },
     {
       "scenario_type": "network_degradation",
@@ -516,9 +525,9 @@
       "baseline_hypothesis": "link congestion on core-router-1 causing packet loss",
       "baseline_score": 1.0,
       "baseline_confidence": 0.55,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Congestion on core routers is causing packet loss and high latency.",
+      "llm_score": 0.83,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "dns_outage",
@@ -527,9 +536,9 @@
       "baseline_hypothesis": "authoritative DNS cluster outage in region-east",
       "baseline_score": 1.0,
       "baseline_confidence": 0.6,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Resolver overload is causing DNS failures.",
+      "llm_score": 0.469,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "bgp_flap",
@@ -538,9 +547,9 @@
       "baseline_hypothesis": "unstable BGP session with upstream AS causing route flaps",
       "baseline_score": 0.774,
       "baseline_confidence": 0.58,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "BGP session flapping due to network congestion.",
+      "llm_score": 0.659,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "fiber_cut",
@@ -549,9 +558,9 @@
       "baseline_hypothesis": "fiber cut on metro ring segment causing optical link failure",
       "baseline_score": 0.803,
       "baseline_confidence": 0.65,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Fiber cut is impacting multiple optical links, causing loss of signal and link down events.",
+      "llm_score": 0.488,
+      "llm_confidence": 0.8
     },
     {
       "scenario_type": "router_freeze",
@@ -560,9 +569,9 @@
       "baseline_hypothesis": "control plane freeze on core router causing forwarding issues",
       "baseline_score": 0.902,
       "baseline_confidence": 0.55,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "The router's control plane is experiencing a resource exhaustion issue, leading to hangs and CPU spikes.",
+      "llm_score": 0.701,
+      "llm_confidence": 0.7
     },
     {
       "scenario_type": "isp_peering_congestion",
@@ -571,9 +580,9 @@
       "baseline_hypothesis": "congestion on ISP peering link causing packet loss",
       "baseline_score": 0.812,
       "baseline_confidence": 0.57,
-      "llm_hypothesis": null,
-      "llm_score": null,
-      "llm_confidence": null
+      "llm_hypothesis": "Transit congestion on peering links is causing packet loss and high latency.",
+      "llm_score": 0.682,
+      "llm_confidence": 0.75
     }
   ],
   "manual_label_cases": 20,

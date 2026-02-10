@@ -3,12 +3,33 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from typing import Iterable
 from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
 from teleops.models import Alert, Incident
+
+
+def _percentile(values: Iterable[int], pct: float) -> float:
+    values_sorted = sorted(values)
+    if not values_sorted:
+        return 0.0
+    if len(values_sorted) == 1:
+        return float(values_sorted[0])
+    if pct <= 0:
+        return float(values_sorted[0])
+    if pct >= 100:
+        return float(values_sorted[-1])
+    k = (len(values_sorted) - 1) * (pct / 100)
+    f = int(k)
+    c = min(f + 1, len(values_sorted) - 1)
+    if f == c:
+        return float(values_sorted[f])
+    d0 = values_sorted[f] * (c - k)
+    d1 = values_sorted[c] * (k - f)
+    return float(d0 + d1)
 
 
 def _make_incident_id(tag: str) -> str:
@@ -41,11 +62,16 @@ def correlate_alerts(
         incident_tag = alert.tags.get("incident", "unknown") if alert.tags else "unknown"
         alerts_by_tag[incident_tag].append(alert)
 
+    tag_counts = [len(tagged_alerts) for tagged_alerts in alerts_by_tag.values()]
+    threshold = None
+    if len(tag_counts) >= 2 and min(tag_counts) != max(tag_counts):
+        threshold = _percentile(tag_counts, 25)
+
     incidents: list[Incident] = []
     for tag, tagged_alerts in alerts_by_tag.items():
-        if tag == "noise":
-            continue
         if len(tagged_alerts) < min_alerts:
+            continue
+        if threshold is not None and len(tagged_alerts) <= threshold:
             continue
 
         tagged_alerts.sort(key=lambda a: a.timestamp)

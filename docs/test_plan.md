@@ -26,7 +26,7 @@
 - Metrics endpoints: overview payloads and test/eval result inclusion.
 
 ### 4) LLM + RAG
-- JSON parsing for LLM outputs (fenced/embedded JSON).
+- JSON parsing for LLM outputs (reject markdown-wrapped JSON; allow embedded JSON).
 - RAG retrieval path: smoke-level test or local-only with skip if dependencies missing.
 
 ### 5) Evaluation

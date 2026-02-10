@@ -20,6 +20,8 @@ venv/
 teleops.db
 storage/*
 !storage/evaluation_results.json
+!storage/benchmarks/
+!storage/benchmarks/rca_latency.json
 *.log
 
 # OS

@@ -89,9 +89,15 @@ class GeminiClient(BaseLLMClient):
         model = genai.GenerativeModel(self.model)
 
         # Configure timeout via generation config
-        generation_config = genai.GenerationConfig(
-            temperature=0.2,
-        )
+        try:
+            generation_config = genai.GenerationConfig(
+                temperature=0.2,
+                response_mime_type="application/json",
+            )
+        except TypeError:
+            generation_config = genai.GenerationConfig(
+                temperature=0.2,
+            )
         try:
             response = model.generate_content(
                 prompt,

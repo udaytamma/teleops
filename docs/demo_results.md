@@ -12,9 +12,9 @@
 | Metric | Value |
 | --- | --- |
 | Test pass rate | 100% |
-| Coverage | 79.57% |
+| Coverage | 79.25% |
 | Baseline RCA avg (synthetic) | 0.894 |
-| LLM RCA avg (synthetic) | Not run in latest results |
+| LLM RCA avg (synthetic) | 0.658 |
 | Manual label avg | 0.451 |
 
 ## Before/After (Baseline vs LLM)
@@ -26,7 +26,7 @@
 | Confidence | Fixed | Adaptive |
 
 ## Why LLM Scores Lag (Short Analysis)
-- LLM results are not captured in the latest stored evaluation run; when LLM is enabled, scores can lag for the following reasons.
+- LLM scores trail the baseline in the latest 50-run evaluation (see `storage/evaluation_results.json`).
 - **Prompt generality**: LLM returns generic hypotheses rather than matching specific ground-truth strings.
 - **RAG depth**: The RAG corpus is intentionally minimal; evidence is present but not highly specific.
 - **Semantic scoring**: Evaluation uses cosine similarity via `sentence-transformers/all-MiniLM-L6-v2`. LLM paraphrases score lower than exact baseline matches but are no longer penalized as harshly as with string matching.
