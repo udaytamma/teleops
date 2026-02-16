@@ -3,7 +3,7 @@
 import logging
 import sys
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     admin_token: str | None = None
     metrics_token: str | None = None
     require_tenant_id: bool = False
+    teleops_tenant_id: str | None = Field(default=None, alias="TELEOPS_TENANT_ID")
 
     # CORS
     cors_origins: list[str] = Field(default=["http://localhost:8501", "http://localhost:3000"])
@@ -62,7 +63,27 @@ class Settings(BaseSettings):
     audit_log_max_bytes: int = 5_000_000
     audit_log_backup_count: int = 3
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", populate_by_name=True)
+
+    @model_validator(mode="after")
+    def _validate_production_security(self) -> "Settings":
+        """Enforce required security settings in production."""
+        if self.environment == "production":
+            missing: list[str] = []
+            if not self.api_token:
+                missing.append("API_TOKEN")
+            if not self.admin_token:
+                missing.append("ADMIN_TOKEN")
+            if not self.metrics_token:
+                missing.append("METRICS_TOKEN")
+            if self.require_tenant_id and not self.teleops_tenant_id:
+                missing.append("TELEOPS_TENANT_ID")
+            if missing:
+                raise ValueError(
+                    "Missing required settings for production: "
+                    + ", ".join(missing)
+                )
+        return self
 
 
 settings = Settings()

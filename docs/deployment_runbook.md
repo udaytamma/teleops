@@ -20,7 +20,7 @@ docker push gcr.io/<project>/teleops-api:latest
 ```bash
 gcloud run deploy teleops-api \
   --image gcr.io/<project>/teleops-api:latest \
-  --set-env-vars LLM_PROVIDER=gemini,GEMINI_API_KEY=<key>,DATABASE_URL=<url> \
+  --set-env-vars LLM_PROVIDER=gemini,GEMINI_API_KEY=<key>,DATABASE_URL=<url>,ENVIRONMENT=production,API_TOKEN=<token>,ADMIN_TOKEN=<token>,METRICS_TOKEN=<token> \
   --port 8000 \
   --memory 512Mi \
   --cpu 1
@@ -29,12 +29,13 @@ gcloud run deploy teleops-api \
 ### 3. Verify Health
 ```bash
 curl -f https://<service-url>/health
-curl -f https://<service-url>/incidents
+curl -H "X-API-Key: <API_TOKEN>" -f https://<service-url>/incidents
 ```
 
 ### 4. Deploy Streamlit UI (Optional)
 - Run as a separate Cloud Run service or local operator demo.
 - Set `API_BASE_URL` to point to the deployed API.
+- Export `TELEOPS_API_TOKEN` (and optionally `TELEOPS_METRICS_TOKEN`) so the UI passes `X-API-Key` headers.
 
 ## Rollback
 - Redeploy the previous container image tag:
@@ -66,7 +67,7 @@ python -c "from teleops.rag.index import build_index; build_index()"
 ### Database Reset and Recovery
 ```bash
 # Reset all incidents and RCA artifacts (destructive)
-curl -X POST https://<service-url>/reset
+curl -H "X-API-Key: <ADMIN_TOKEN>" -X POST https://<service-url>/reset
 ```
 - SQLite database is at `storage/teleops.db`.
 - Back up the file before any destructive operations.

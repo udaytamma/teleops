@@ -150,7 +150,13 @@ def require_metrics_token(
 
 
 def require_tenant_id(tenant_id: str | None = Header(default=None, alias="X-Tenant-Id")) -> str | None:
-    if settings.require_tenant_id and not tenant_id:
+    if not settings.require_tenant_id:
+        return None
+    if settings.teleops_tenant_id:
+        if tenant_id and tenant_id != settings.teleops_tenant_id:
+            raise HTTPException(status_code=403, detail="Invalid tenant")
+        return settings.teleops_tenant_id
+    if not tenant_id:
         raise HTTPException(status_code=400, detail="X-Tenant-Id header required")
     return tenant_id
 

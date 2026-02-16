@@ -1,5 +1,12 @@
 # 3-Minute Demo Script
 
+## Pre-Demo Security Setup (Public Demo)
+- Set tokens and export to the API service: `API_TOKEN`, `ADMIN_TOKEN`, `METRICS_TOKEN`.
+- If tenant isolation is enabled: set `REQUIRE_TENANT_ID=true` and `TELEOPS_TENANT_ID=demo-tenant`.
+- Set UI headers via env:
+  - `TELEOPS_API_TOKEN=<API_TOKEN>`
+  - `TELEOPS_METRICS_TOKEN=<METRICS_TOKEN>`
+
 ## 0:00–0:30 — Setup + Context
 - "TeleOps takes noisy alerts and turns them into incidents with RCA."
 - Show the Scenario Builder on the left and point to the incident queue.

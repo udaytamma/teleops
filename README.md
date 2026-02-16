@@ -159,11 +159,17 @@ teleops/
 | `RAG_CORPUS_DIR` | Runbook directory | `./docs/rag_corpus` |
 | `RAG_TOP_K` | Retrieved context chunks | `6` |
 | `LOG_FORMAT` | `json` or `text` | `json` |
-| `API_TOKEN` | API token for read/write endpoints | optional |
-| `ADMIN_TOKEN` | Admin token for destructive actions | optional |
-| `METRICS_TOKEN` | Token for `/metrics/overview` | optional |
-| `REQUIRE_TENANT_ID` | Enforce `X-Tenant-Id` header | `false` |
-| `TELEOPS_TENANT_ID` | UI header value for tenant | optional |
+| `API_TOKEN` | API token for read/write endpoints | required in production |
+| `ADMIN_TOKEN` | Admin token for destructive actions | required in production |
+| `METRICS_TOKEN` | Token for `/metrics/overview` | required in production |
+| `REQUIRE_TENANT_ID` | Enforce tenant isolation | `false` |
+| `TELEOPS_TENANT_ID` | Server-bound tenant ID when tenant isolation is enabled | optional (required if `REQUIRE_TENANT_ID=true` in production) |
+
+**Public demo / production note:** When `ENVIRONMENT=production`, the API will refuse to start unless `API_TOKEN`, `ADMIN_TOKEN`, and `METRICS_TOKEN` are set. If `REQUIRE_TENANT_ID=true`, `TELEOPS_TENANT_ID` is also required.
+
+**Why fail-closed?** The validator runs at Settings construction (startup), not at request time. If a key is missing, the container crashes immediately on deploy -- catching misconfiguration during deployment, not during a customer request at 2am. This follows the same pattern Stripe and AWS use for secret validation.
+
+**UI tokens:** The Streamlit UI expects `TELEOPS_API_TOKEN` (and optionally `TELEOPS_METRICS_TOKEN`) to pass `X-API-Key` headers to the API.
 
 ### RAG Corpus
 
