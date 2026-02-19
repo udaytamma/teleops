@@ -6,7 +6,7 @@ import streamlit as st
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from theme import inject_theme, hero, divider, nav_links, badge, empty_state
+from theme import inject_theme, hero, divider, nav_links, badge, empty_state, safe_api_call, safe_error_message
 
 API_URL = os.getenv("TELEOPS_API_URL") or os.getenv("API_BASE_URL", "http://localhost:8000")
 API_TOKEN = os.getenv("TELEOPS_API_TOKEN", "")
@@ -36,9 +36,9 @@ hero(
 
 st.write("")
 
-incidents_resp = requests.get(f"{API_URL}/incidents", headers=REQUEST_HEADERS, timeout=30)
-if incidents_resp.status_code >= 400:
-    st.error(incidents_resp.text)
+incidents_resp, incidents_err = safe_api_call("GET", f"{API_URL}/incidents", headers=REQUEST_HEADERS, timeout=30)
+if incidents_err:
+    st.error(incidents_err)
     st.stop()
 
 incidents = incidents_resp.json()
@@ -48,30 +48,29 @@ if not incidents:
 
 selected = st.selectbox("Select Incident", options=incidents, format_func=lambda i: f"{i['id']} - {i.get('summary', 'No summary')[:40]}")
 
-artifact_resp = requests.get(
-    f"{API_URL}/rca/{selected['id']}/latest",
-    params={"source": "llm"},
-    headers=REQUEST_HEADERS,
-    timeout=30,
-)
+try:
+    artifact_resp = requests.get(
+        f"{API_URL}/rca/{selected['id']}/latest",
+        params={"source": "llm"},
+        headers=REQUEST_HEADERS,
+        timeout=30,
+    )
+except (requests.exceptions.Timeout, requests.exceptions.ConnectionError, requests.exceptions.RequestException) as exc:
+    st.error(f"Could not connect to the API: {exc}")
+    st.stop()
 
 if artifact_resp.status_code == 404:
     st.warning("No LLM RCA found for this incident.")
     if st.button("Run LLM RCA", type="primary"):
-        try:
-            with st.spinner("Running LLM RCA (may take up to 2 minutes)..."):
-                run_resp = requests.post(f"{API_URL}/rca/{selected['id']}/llm", headers=REQUEST_HEADERS, timeout=180)
-            if run_resp.status_code >= 400:
-                st.error(run_resp.text)
-            else:
-                st.rerun()
-        except requests.exceptions.Timeout:
-            st.error("LLM RCA timed out. Gemini API may be slow -- please retry.")
-        except requests.exceptions.ConnectionError:
-            st.error("Could not connect to the API. Please check that the backend is running.")
+        with st.spinner("Running LLM RCA (may take up to 2 minutes)..."):
+            run_resp, run_err = safe_api_call("POST", f"{API_URL}/rca/{selected['id']}/llm", headers=REQUEST_HEADERS, timeout=180)
+        if run_err:
+            st.error(run_err)
+        else:
+            st.rerun()
     st.stop()
 elif artifact_resp.status_code >= 400:
-    st.error(artifact_resp.text)
+    st.error(safe_error_message(artifact_resp))
     st.stop()
 
 artifact = artifact_resp.json()

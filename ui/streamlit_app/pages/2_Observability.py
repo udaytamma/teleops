@@ -1,12 +1,11 @@
 """TeleOps Observability Dashboard."""
 
 import os
-import requests
 import streamlit as st
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from theme import inject_theme, hero, nav_links, metric_card, progress_bar, empty_state, badge
+from theme import inject_theme, hero, nav_links, metric_card, progress_bar, empty_state, badge, safe_api_call
 
 API_URL = os.getenv("TELEOPS_API_URL") or os.getenv("API_BASE_URL", "http://localhost:8000")
 API_TOKEN = os.getenv("TELEOPS_API_TOKEN", "")
@@ -37,9 +36,9 @@ hero(
 
 st.write("")
 
-resp = requests.get(f"{API_URL}/metrics/overview", headers=REQUEST_HEADERS, timeout=30)
-if resp.status_code >= 400:
-    st.error(resp.text)
+resp, err = safe_api_call("GET", f"{API_URL}/metrics/overview", headers=REQUEST_HEADERS, timeout=30)
+if err:
+    st.error(err)
     st.stop()
 
 payload = resp.json()
@@ -110,9 +109,10 @@ if evaluation_results and evaluation_results.get("quality_metrics"):
 
     # Scoring method badge
     scoring = evaluation_results.get("scoring_method", "unknown")
+    runs_count = evaluation_results.get("runs", 0)
     st.markdown(
         f'{badge(scoring, "accent")} &nbsp; '
-        f'{badge(f"{evaluation_results.get(\"runs\", 0)} scenarios", "accent-2")}',
+        f'{badge(f"{runs_count} scenarios", "accent-2")}',
         unsafe_allow_html=True,
     )
     st.write("")

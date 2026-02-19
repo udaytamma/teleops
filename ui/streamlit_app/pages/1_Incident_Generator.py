@@ -6,7 +6,6 @@ and baseline vs LLM comparison.
 
 import os
 
-import requests
 import streamlit as st
 
 from theme import (
@@ -18,6 +17,7 @@ from theme import (
     nav_links,
     confidence_gauge,
     empty_state,
+    safe_api_call,
 )
 
 API_URL = os.getenv("TELEOPS_API_URL") or os.getenv("API_BASE_URL", "http://localhost:8000")
@@ -211,9 +211,9 @@ with st.sidebar:
             "seed": seed,
         }
         with st.spinner("Generating..."):
-            resp = requests.post(f"{API_URL}/generate", json=payload, headers=REQUEST_HEADERS, timeout=30)
-        if resp.status_code >= 400:
-            st.error(f"Error: {resp.text}")
+            resp, err = safe_api_call("POST", f"{API_URL}/generate", json=payload, headers=REQUEST_HEADERS, timeout=30)
+        if err:
+            st.error(f"Error: {err}")
         else:
             st.success("Scenario generated successfully")
             with st.expander("Generation details"):
@@ -231,9 +231,9 @@ st.markdown(
 )
 
 # Fetch incidents
-incidents_resp = requests.get(f"{API_URL}/incidents", headers=REQUEST_HEADERS, timeout=30)
-if incidents_resp.status_code >= 400:
-    st.error(incidents_resp.text)
+incidents_resp, incidents_err = safe_api_call("GET", f"{API_URL}/incidents", headers=REQUEST_HEADERS, timeout=30)
+if incidents_err:
+    st.error(incidents_err)
     incidents = []
 else:
     incidents = incidents_resp.json()
@@ -280,9 +280,9 @@ if incidents:
     with filter_cols[3]:
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
         if st.button("Clear All", help="Remove all incidents from the queue"):
-            resp = requests.post(f"{API_URL}/reset", headers=REQUEST_HEADERS, timeout=30)
-            if resp.status_code >= 400:
-                st.error(resp.text)
+            resp, err = safe_api_call("POST", f"{API_URL}/reset", headers=REQUEST_HEADERS, timeout=30)
+            if err:
+                st.error(err)
             else:
                 st.rerun()
 
@@ -312,37 +312,29 @@ if incidents:
             run_rca = st.button("Run RCA", type="primary", use_container_width=True)
 
         if run_rca:
-            try:
-                with st.spinner("Running baseline RCA..."):
-                    baseline_resp = requests.post(
-                        f"{API_URL}/rca/{selected['id']}/baseline",
-                        headers=REQUEST_HEADERS,
-                        timeout=60,
-                    )
-                if baseline_resp.status_code >= 400:
-                    st.error(f"Baseline RCA failed: {baseline_resp.text}")
-                else:
-                    st.session_state["baseline_rca"] = baseline_resp.json()
-            except requests.exceptions.Timeout:
-                st.error("Baseline RCA timed out. The API may be under heavy load — please retry.")
-            except requests.exceptions.ConnectionError:
-                st.error("Could not connect to the API. Please check that the backend is running.")
+            with st.spinner("Running baseline RCA..."):
+                baseline_resp, baseline_err = safe_api_call(
+                    "POST",
+                    f"{API_URL}/rca/{selected['id']}/baseline",
+                    headers=REQUEST_HEADERS,
+                    timeout=60,
+                )
+            if baseline_err:
+                st.error(f"Baseline RCA failed: {baseline_err}")
+            else:
+                st.session_state["baseline_rca"] = baseline_resp.json()
 
-            try:
-                with st.spinner("Running LLM RCA (may take up to 2 minutes)..."):
-                    llm_resp = requests.post(
-                        f"{API_URL}/rca/{selected['id']}/llm",
-                        headers=REQUEST_HEADERS,
-                        timeout=180,
-                    )
-                if llm_resp.status_code >= 400:
-                    st.error(f"LLM RCA failed: {llm_resp.text}")
-                else:
-                    st.session_state["llm_rca"] = llm_resp.json()
-            except requests.exceptions.Timeout:
-                st.error("LLM RCA timed out. Gemini API may be slow — please retry.")
-            except requests.exceptions.ConnectionError:
-                st.error("Could not connect to the API. Please check that the backend is running.")
+            with st.spinner("Running LLM RCA (may take up to 2 minutes)..."):
+                llm_resp, llm_err = safe_api_call(
+                    "POST",
+                    f"{API_URL}/rca/{selected['id']}/llm",
+                    headers=REQUEST_HEADERS,
+                    timeout=180,
+                )
+            if llm_err:
+                st.error(f"LLM RCA failed: {llm_err}")
+            else:
+                st.session_state["llm_rca"] = llm_resp.json()
     else:
         empty_state("No incidents match filters", "")
 else:
@@ -380,13 +372,14 @@ if incidents and filtered_incidents:
         st.markdown(f"<span style='color: var(--accent); font-family: JetBrains Mono; font-weight: 600;'>{alert_count}</span>", unsafe_allow_html=True)
 
     # Fetch and display alerts
-    alert_resp = requests.get(
+    alert_resp, alert_err = safe_api_call(
+        "GET",
         f"{API_URL}/incidents/{selected['id']}/alerts",
         headers=REQUEST_HEADERS,
         timeout=30,
     )
-    if alert_resp.status_code >= 400:
-        st.error(alert_resp.text)
+    if alert_err:
+        st.error(alert_err)
     else:
         alert_rows = [
             {
@@ -466,30 +459,32 @@ if baseline_payload or llm_payload:
                         if not reviewer_name.strip():
                             st.error("Reviewer name required")
                         else:
-                            resp = requests.post(
+                            resp, err = safe_api_call(
+                                "POST",
                                 f"{API_URL}/rca/{artifact_id}/review",
                                 json={"decision": "accepted", "reviewed_by": reviewer_name.strip(), "notes": review_notes or None},
                                 headers=REQUEST_HEADERS,
                                 timeout=10,
                             )
-                            if resp.status_code < 400:
-                                st.success(f"{label} hypothesis accepted")
+                            if err:
+                                st.error(f"Review failed: {err}")
                             else:
-                                st.error(f"Review failed: {resp.text}")
+                                st.success(f"{label} hypothesis accepted")
                 with btn_col2:
                     if st.button(f"Reject", key=f"reject_{label}", use_container_width=True):
                         if not reviewer_name.strip():
                             st.error("Reviewer name required")
                         else:
-                            resp = requests.post(
+                            resp, err = safe_api_call(
+                                "POST",
                                 f"{API_URL}/rca/{artifact_id}/review",
                                 json={"decision": "rejected", "reviewed_by": reviewer_name.strip(), "notes": review_notes or None},
                                 headers=REQUEST_HEADERS,
                                 timeout=10,
                             )
-                            if resp.status_code < 400:
-                                st.warning(f"{label} hypothesis rejected")
+                            if err:
+                                st.error(f"Review failed: {err}")
                             else:
-                                st.error(f"Review failed: {resp.text}")
+                                st.warning(f"{label} hypothesis rejected")
     else:
         st.caption("Run RCA above to generate hypotheses for review.")

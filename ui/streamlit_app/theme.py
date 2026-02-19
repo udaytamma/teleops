@@ -802,6 +802,40 @@ def confidence_gauge(value: float, label: str) -> str:
     """
 
 
+def safe_error_message(resp) -> str:
+    """Extract a human-readable error from an API response, handling HTML error pages."""
+    content_type = resp.headers.get("content-type", "")
+    if "text/html" in content_type or resp.text.strip().startswith("<!"):
+        return f"API returned HTTP {resp.status_code}. The backend may be unavailable."
+    text = resp.text[:500]
+    try:
+        data = resp.json()
+        return data.get("detail", text)
+    except Exception:
+        return text
+
+
+def safe_api_call(method: str, url: str, **kwargs):
+    """Make an API call with safe error handling. Returns (response, error_message).
+
+    If the call succeeds, returns (response, None).
+    If it fails (HTTP error, timeout, connection error), returns (None, error_string).
+    """
+    import requests as _requests
+
+    try:
+        resp = _requests.request(method, url, **kwargs)
+        if resp.status_code >= 400:
+            return None, safe_error_message(resp)
+        return resp, None
+    except _requests.exceptions.Timeout:
+        return None, "Request timed out. The API may be under heavy load -- please retry."
+    except _requests.exceptions.ConnectionError:
+        return None, "Could not connect to the API. Please check that the backend is running."
+    except _requests.exceptions.RequestException as exc:
+        return None, f"API request failed: {exc}"
+
+
 def empty_state(message: str, icon: str = "") -> None:
     """Render an empty state message."""
     import streamlit as st
