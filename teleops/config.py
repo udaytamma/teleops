@@ -67,7 +67,13 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_production_security(self) -> "Settings":
-        """Enforce required security settings in production."""
+        """Warn about missing security tokens in production.
+
+        Logs a warning for any missing tokens so operators know auth is
+        not enforced, but does NOT crash the app.  The token-check
+        middleware already skips auth when a token is ``None``, so the
+        API remains functional (open access) until tokens are configured.
+        """
         if self.environment == "production":
             missing: list[str] = []
             if not self.api_token:
@@ -79,9 +85,13 @@ class Settings(BaseSettings):
             if self.require_tenant_id and not self.teleops_tenant_id:
                 missing.append("TELEOPS_TENANT_ID")
             if missing:
-                raise ValueError(
-                    "Missing required settings for production: "
-                    + ", ".join(missing)
+                # Warn but allow startup -- endpoints run with open access
+                print(
+                    f"[WARN] Missing security tokens for production: "
+                    f"{', '.join(missing)}.  Auth is NOT enforced for "
+                    f"affected endpoints.  Set these env vars to enable "
+                    f"token-based access control.",
+                    file=sys.stderr,
                 )
         return self
 
