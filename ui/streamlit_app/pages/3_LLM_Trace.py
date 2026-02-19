@@ -48,7 +48,7 @@ if not incidents:
     empty_state("No incidents available. Generate a scenario first.", "")
     st.stop()
 
-selected = st.selectbox("Select Incident", options=incidents, format_func=lambda i: f"{i['id']} - {i.get('summary', 'No summary')[:40]}")
+selected = st.selectbox("Select Incident", options=incidents, format_func=lambda i: f"{i['id'].rsplit('_', 2)[0]} - {i.get('summary', 'No summary')[:50]}")
 
 artifact_resp, artifact_err = safe_api_call(
     "GET",

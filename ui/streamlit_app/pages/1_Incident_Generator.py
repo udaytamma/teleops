@@ -312,7 +312,7 @@ if incidents:
             selected = st.selectbox(
                 "Select Incident",
                 options=filtered_incidents,
-                format_func=lambda i: f"{i['id']} - {i.get('summary', 'No summary')[:30]}",
+                format_func=lambda i: f"{i['id'].rsplit('_', 2)[0]} - {i.get('summary', 'No summary')[:50]}",
                 label_visibility="collapsed",
             )
         with row[1]:
