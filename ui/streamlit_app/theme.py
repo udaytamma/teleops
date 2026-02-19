@@ -802,31 +802,46 @@ def confidence_gauge(value: float, label: str) -> str:
     """
 
 
+def _is_html(text: str) -> bool:
+    """Check if text looks like an HTML page (e.g. Cloudflare error page)."""
+    stripped = text.strip()[:100].lower()
+    return stripped.startswith("<!doctype") or stripped.startswith("<html") or stripped.startswith("<!–")
+
+
 def safe_error_message(resp) -> str:
     """Extract a human-readable error from an API response, handling HTML error pages."""
-    content_type = resp.headers.get("content-type", "")
-    if "text/html" in content_type or resp.text.strip().startswith("<!"):
-        return f"API returned HTTP {resp.status_code}. The backend may be unavailable."
-    text = resp.text[:500]
     try:
-        data = resp.json()
-        return data.get("detail", text)
+        content_type = resp.headers.get("content-type", "")
+        if "text/html" in content_type or _is_html(resp.text):
+            return f"API returned HTTP {resp.status_code}. The backend may be unavailable."
+        text = resp.text[:500]
+        try:
+            data = resp.json()
+            return data.get("detail", text)
+        except Exception:
+            return text
     except Exception:
-        return text
+        return f"API returned HTTP {getattr(resp, 'status_code', 'unknown')}."
 
 
 def safe_api_call(method: str, url: str, **kwargs):
     """Make an API call with safe error handling. Returns (response, error_message).
 
-    If the call succeeds, returns (response, None).
-    If it fails (HTTP error, timeout, connection error), returns (None, error_string).
+    If the call succeeds and returns valid JSON-compatible content, returns (response, None).
+    If it fails (HTTP error, HTML body, timeout, connection error), returns (None, error_string).
+    Error strings for HTTP errors are prefixed with "[STATUS_CODE] " for programmatic checks.
     """
     import requests as _requests
 
     try:
         resp = _requests.request(method, url, **kwargs)
         if resp.status_code >= 400:
-            return None, safe_error_message(resp)
+            msg = safe_error_message(resp)
+            return None, f"[{resp.status_code}] {msg}"
+        # Guard against 200 responses that are actually HTML error pages
+        # (e.g. Cloudflare "Always Online" or proxy cache returning stale HTML)
+        if _is_html(resp.text):
+            return None, "API returned an HTML page instead of JSON. The backend may be behind a proxy that is masking errors."
         return resp, None
     except _requests.exceptions.Timeout:
         return None, "Request timed out. The API may be under heavy load -- please retry."
@@ -834,6 +849,49 @@ def safe_api_call(method: str, url: str, **kwargs):
         return None, "Could not connect to the API. Please check that the backend is running."
     except _requests.exceptions.RequestException as exc:
         return None, f"API request failed: {exc}"
+
+
+def safe_json(resp, fallback=None):
+    """Safely parse JSON from a response, returning fallback if it fails."""
+    try:
+        return resp.json()
+    except Exception:
+        return fallback
+
+
+def check_api_connection(api_url: str, headers: dict | None = None) -> bool:
+    """Check if the API backend is reachable. Returns True if healthy, False otherwise.
+
+    If unreachable, renders a full-width error banner and calls st.stop().
+    """
+    import streamlit as st
+
+    resp, err = safe_api_call("GET", f"{api_url}/health", headers=headers or {}, timeout=10)
+    if err:
+        st.markdown(
+            f"""
+            <div style="
+                background: linear-gradient(135deg, rgba(255,107,107,0.15) 0%, rgba(255,107,107,0.05) 100%);
+                border: 1px solid rgba(255,107,107,0.4);
+                border-radius: 12px;
+                padding: 24px 32px;
+                margin: 16px 0;
+                text-align: center;
+            ">
+                <h3 style="color: #FF6B6B; margin: 0 0 8px 0; font-size: 18px;">API Backend Unavailable</h3>
+                <p style="color: #8BA3B5; margin: 0 0 12px 0; font-size: 14px;">
+                    The TeleOps API at <code style="color: #FF9F43;">{api_url}</code> is not responding.
+                </p>
+                <p style="color: #5A7384; margin: 0; font-size: 13px;">
+                    {err}
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.stop()
+        return False
+    return True
 
 
 def empty_state(message: str, icon: str = "") -> None:

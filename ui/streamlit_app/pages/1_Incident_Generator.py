@@ -5,9 +5,11 @@ and baseline vs LLM comparison.
 """
 
 import os
+import sys
 
 import streamlit as st
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from theme import (
     inject_theme,
     hero,
@@ -18,6 +20,8 @@ from theme import (
     confidence_gauge,
     empty_state,
     safe_api_call,
+    safe_json,
+    check_api_connection,
 )
 
 API_URL = os.getenv("TELEOPS_API_URL") or os.getenv("API_BASE_URL", "http://localhost:8000")
@@ -120,6 +124,9 @@ st.set_page_config(
 # Inject theme
 inject_theme()
 
+# Check API connectivity before rendering the page
+check_api_connection(API_URL, REQUEST_HEADERS)
+
 # Navigation
 nav_links([
     ("Incident Generator", "pages/1_Incident_Generator.py", True),
@@ -213,11 +220,13 @@ with st.sidebar:
         with st.spinner("Generating..."):
             resp, err = safe_api_call("POST", f"{API_URL}/generate", json=payload, headers=REQUEST_HEADERS, timeout=30)
         if err:
-            st.error(f"Error: {err}")
+            st.error(err)
         else:
             st.success("Scenario generated successfully")
-            with st.expander("Generation details"):
-                st.json(resp.json())
+            data = safe_json(resp, {})
+            if data:
+                with st.expander("Generation details"):
+                    st.json(data)
 
 # Main content - Incident Queue
 st.markdown(
@@ -236,7 +245,9 @@ if incidents_err:
     st.error(incidents_err)
     incidents = []
 else:
-    incidents = incidents_resp.json()
+    incidents = safe_json(incidents_resp, [])
+    if not isinstance(incidents, list):
+        incidents = []
 
 if incidents:
     # Stats bar
@@ -322,7 +333,7 @@ if incidents:
             if baseline_err:
                 st.error(f"Baseline RCA failed: {baseline_err}")
             else:
-                st.session_state["baseline_rca"] = baseline_resp.json()
+                st.session_state["baseline_rca"] = safe_json(baseline_resp, {})
 
             with st.spinner("Running LLM RCA (may take up to 2 minutes)..."):
                 llm_resp, llm_err = safe_api_call(
@@ -334,7 +345,7 @@ if incidents:
             if llm_err:
                 st.error(f"LLM RCA failed: {llm_err}")
             else:
-                st.session_state["llm_rca"] = llm_resp.json()
+                st.session_state["llm_rca"] = safe_json(llm_resp, {})
     else:
         empty_state("No incidents match filters", "")
 else:
@@ -381,6 +392,9 @@ if incidents and filtered_incidents:
     if alert_err:
         st.error(alert_err)
     else:
+        alerts_data = safe_json(alert_resp, [])
+        if not isinstance(alerts_data, list):
+            alerts_data = []
         alert_rows = [
             {
                 "timestamp": a.get("timestamp", "")[:19],
@@ -390,7 +404,7 @@ if incidents and filtered_incidents:
                 "type": a.get("alert_type", ""),
                 "message": a.get("message", "")[:60] + "..." if len(a.get("message", "")) > 60 else a.get("message", ""),
             }
-            for a in alert_resp.json()[:12]
+            for a in alerts_data[:12]
         ]
         with st.expander(f"Alert sample (showing {len(alert_rows)} of {alert_count})"):
             st.dataframe(alert_rows, use_container_width=True, hide_index=True)

@@ -1,12 +1,11 @@
 """TeleOps LLM Response Viewer."""
 
 import os
-import requests
 import streamlit as st
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from theme import inject_theme, hero, divider, nav_links, badge, empty_state, safe_api_call, safe_error_message
+from theme import inject_theme, hero, divider, nav_links, badge, empty_state, safe_api_call, safe_json, check_api_connection
 
 API_URL = os.getenv("TELEOPS_API_URL") or os.getenv("API_BASE_URL", "http://localhost:8000")
 API_TOKEN = os.getenv("TELEOPS_API_TOKEN", "")
@@ -19,6 +18,7 @@ if TENANT_ID:
 
 st.set_page_config(page_title="LLM Response Viewer", layout="wide")
 inject_theme()
+check_api_connection(API_URL, REQUEST_HEADERS)
 
 nav_links([
     ("Incident Generator", "pages/1_Incident_Generator.py", False),
@@ -41,39 +41,43 @@ if incidents_err:
     st.error(incidents_err)
     st.stop()
 
-incidents = incidents_resp.json()
+incidents = safe_json(incidents_resp, [])
+if not isinstance(incidents, list):
+    incidents = []
 if not incidents:
     empty_state("No incidents available. Generate a scenario first.", "")
     st.stop()
 
 selected = st.selectbox("Select Incident", options=incidents, format_func=lambda i: f"{i['id']} - {i.get('summary', 'No summary')[:40]}")
 
-try:
-    artifact_resp = requests.get(
-        f"{API_URL}/rca/{selected['id']}/latest",
-        params={"source": "llm"},
-        headers=REQUEST_HEADERS,
-        timeout=30,
-    )
-except (requests.exceptions.Timeout, requests.exceptions.ConnectionError, requests.exceptions.RequestException) as exc:
-    st.error(f"Could not connect to the API: {exc}")
-    st.stop()
+artifact_resp, artifact_err = safe_api_call(
+    "GET",
+    f"{API_URL}/rca/{selected['id']}/latest",
+    params={"source": "llm"},
+    headers=REQUEST_HEADERS,
+    timeout=30,
+)
 
-if artifact_resp.status_code == 404:
-    st.warning("No LLM RCA found for this incident.")
-    if st.button("Run LLM RCA", type="primary"):
-        with st.spinner("Running LLM RCA (may take up to 2 minutes)..."):
-            run_resp, run_err = safe_api_call("POST", f"{API_URL}/rca/{selected['id']}/llm", headers=REQUEST_HEADERS, timeout=180)
-        if run_err:
-            st.error(run_err)
-        else:
-            st.rerun()
-    st.stop()
-elif artifact_resp.status_code >= 400:
-    st.error(safe_error_message(artifact_resp))
-    st.stop()
+if artifact_err:
+    # Check if it was a 404 (no RCA yet) vs a real error
+    if artifact_err.startswith("[404]"):
+        st.warning("No LLM RCA found for this incident.")
+        if st.button("Run LLM RCA", type="primary"):
+            with st.spinner("Running LLM RCA (may take up to 2 minutes)..."):
+                run_resp, run_err = safe_api_call("POST", f"{API_URL}/rca/{selected['id']}/llm", headers=REQUEST_HEADERS, timeout=180)
+            if run_err:
+                st.error(run_err)
+            else:
+                st.rerun()
+        st.stop()
+    else:
+        st.error(artifact_err)
+        st.stop()
 
-artifact = artifact_resp.json()
+artifact = safe_json(artifact_resp, {})
+if not isinstance(artifact, dict) or not artifact:
+    st.error("Could not parse RCA artifact response.")
+    st.stop()
 evidence = artifact.get("evidence", {})
 
 # Support both new format (llm_request/llm_response) and legacy format (flat fields)

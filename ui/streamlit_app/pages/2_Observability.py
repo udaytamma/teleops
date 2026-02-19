@@ -5,7 +5,7 @@ import streamlit as st
 
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from theme import inject_theme, hero, nav_links, metric_card, progress_bar, empty_state, badge, safe_api_call
+from theme import inject_theme, hero, nav_links, metric_card, progress_bar, empty_state, badge, safe_api_call, safe_json, check_api_connection
 
 API_URL = os.getenv("TELEOPS_API_URL") or os.getenv("API_BASE_URL", "http://localhost:8000")
 API_TOKEN = os.getenv("TELEOPS_API_TOKEN", "")
@@ -19,6 +19,7 @@ if TENANT_ID:
 
 st.set_page_config(page_title="TeleOps Observability", layout="wide")
 inject_theme()
+check_api_connection(API_URL, REQUEST_HEADERS)
 
 nav_links([
     ("Incident Generator", "pages/1_Incident_Generator.py", False),
@@ -41,7 +42,9 @@ if err:
     st.error(err)
     st.stop()
 
-payload = resp.json()
+payload = safe_json(resp, {})
+if not isinstance(payload, dict):
+    payload = {}
 counts = payload.get("counts", {})
 kpis = payload.get("kpis", {})
 
