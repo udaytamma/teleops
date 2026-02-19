@@ -21,12 +21,12 @@ RUN mkdir -p storage && \
     useradd -m teleops && chown -R teleops:teleops /app
 USER teleops
 
-# Expose port
-EXPOSE 8000
+# Default port (Railway overrides via $PORT env var)
+EXPOSE ${PORT:-8000}
 
-# Health check using curl instead of Python import
+# Health check -- uses $PORT so it works on Railway and locally
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Run API server
-CMD ["uvicorn", "teleops.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run API server -- shell form required for $PORT expansion on Railway
+CMD sh -c "uvicorn teleops.api.app:app --host 0.0.0.0 --port ${PORT:-8000}"
