@@ -60,7 +60,13 @@ def init_firestore() -> None:
     try:
         # Prefer base64-encoded JSON (Railway env var)
         if settings.firestore_credentials_json:
-            cred_json = base64.b64decode(settings.firestore_credentials_json)
+            # Strip whitespace/quotes and fix padding (env vars can mangle base64)
+            raw = settings.firestore_credentials_json.strip().strip('"').strip("'")
+            # Add padding if needed (base64 length must be multiple of 4)
+            padding = 4 - len(raw) % 4
+            if padding != 4:
+                raw += "=" * padding
+            cred_json = base64.b64decode(raw)
             cred_dict = json.loads(cred_json)
             cred = credentials.Certificate(cred_dict)
         elif settings.firestore_credentials_file:
