@@ -1,0 +1,268 @@
+"""Firestore sync layer for persistent incident storage.
+
+Implements a fire-and-forget dual-write pattern: SQLite is the primary
+database for all reads/writes; Firestore receives denormalized incident
+documents in background threads so data survives Railway's ephemeral
+filesystem across deploys.
+
+If Firestore is not configured or encounters errors, the API continues
+to operate normally -- all sync operations log warnings but never raise.
+"""
+
+from __future__ import annotations
+
+import base64
+import json
+import logging
+import threading
+from datetime import datetime
+from typing import Any
+
+from sqlalchemy.orm import Session
+
+from teleops.config import settings
+
+logger = logging.getLogger("teleops.firestore")
+
+# Module-level Firestore client -- set by init_firestore()
+_db = None
+_collection_name: str = settings.firestore_collection
+
+
+def init_firestore() -> None:
+    """Initialize Firebase Admin SDK and Firestore client.
+
+    Supports two credential sources (checked in order):
+    1. FIRESTORE_CREDENTIALS_JSON -- base64-encoded service account JSON (Railway/CI)
+    2. FIRESTORE_CREDENTIALS_FILE -- path to service account JSON file (local dev)
+
+    Sets module-level ``_db`` on success. Logs a warning and returns
+    gracefully if Firestore is not enabled or credentials are missing.
+    """
+    global _db, _collection_name
+
+    if not settings.firestore_enabled:
+        logger.info("Firestore sync disabled (FIRESTORE_ENABLED=false)")
+        return
+
+    try:
+        import firebase_admin
+        from firebase_admin import credentials, firestore
+    except ImportError:
+        logger.warning(
+            "firebase-admin package not installed -- Firestore sync disabled. "
+            "Run: pip install firebase-admin"
+        )
+        return
+
+    _collection_name = settings.firestore_collection
+
+    try:
+        # Prefer base64-encoded JSON (Railway env var)
+        if settings.firestore_credentials_json:
+            cred_json = base64.b64decode(settings.firestore_credentials_json)
+            cred_dict = json.loads(cred_json)
+            cred = credentials.Certificate(cred_dict)
+        elif settings.firestore_credentials_file:
+            cred = credentials.Certificate(settings.firestore_credentials_file)
+        else:
+            logger.warning(
+                "Firestore enabled but no credentials provided. "
+                "Set FIRESTORE_CREDENTIALS_JSON or FIRESTORE_CREDENTIALS_FILE."
+            )
+            return
+
+        # Initialize Firebase app (avoid duplicate initialization)
+        app_name = "teleops-firestore"
+        try:
+            firebase_admin.get_app(app_name)
+        except ValueError:
+            firebase_admin.initialize_app(
+                cred,
+                options={"projectId": settings.firestore_project_id} if settings.firestore_project_id else None,
+                name=app_name,
+            )
+
+        _db = firestore.client(app=firebase_admin.get_app(app_name))
+        logger.info(
+            f"Firestore initialized: project={settings.firestore_project_id}, "
+            f"collection={_collection_name}"
+        )
+    except Exception:
+        logger.exception("Failed to initialize Firestore -- sync disabled")
+        _db = None
+
+
+def _serialize_datetime(value: Any) -> Any:
+    """Convert datetime objects to ISO strings for Firestore."""
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return value
+
+
+def _build_incident_doc(
+    incident_id: str,
+    db_session: Session,
+) -> dict[str, Any] | None:
+    """Build a denormalized Firestore document for an incident.
+
+    Fetches the incident, its alerts, and its RCA artifacts from SQLite
+    and combines them into a single flat document.
+    """
+    # Import here to avoid circular imports (models -> config -> firestore_sync)
+    from teleops.models import Alert, Incident, RCAArtifact
+
+    incident = db_session.query(Incident).filter(Incident.id == incident_id).first()
+    if not incident:
+        logger.warning(f"Incident {incident_id} not found in SQLite -- skipping sync")
+        return None
+
+    # Fetch related alerts
+    alert_dicts: list[dict[str, Any]] = []
+    if incident.related_alert_ids:
+        alerts = db_session.query(Alert).filter(
+            Alert.id.in_(incident.related_alert_ids)
+        ).all()
+        for alert in alerts:
+            alert_dicts.append({
+                "id": alert.id,
+                "timestamp": _serialize_datetime(alert.timestamp),
+                "source_system": alert.source_system,
+                "host": alert.host,
+                "service": alert.service,
+                "severity": alert.severity,
+                "alert_type": alert.alert_type,
+                "message": alert.message,
+                "tags": alert.tags or {},
+            })
+
+    # Fetch RCA artifacts
+    rca_dicts: list[dict[str, Any]] = []
+    rca_artifacts = db_session.query(RCAArtifact).filter(
+        RCAArtifact.incident_id == incident_id
+    ).order_by(RCAArtifact.timestamp.asc()).all()
+    for rca in rca_artifacts:
+        rca_dicts.append({
+            "id": rca.id,
+            "hypotheses": rca.hypotheses or [],
+            "evidence": rca.evidence or {},
+            "confidence_scores": rca.confidence_scores or {},
+            "llm_model": rca.llm_model,
+            "timestamp": _serialize_datetime(rca.timestamp),
+            "duration_ms": rca.duration_ms,
+            "status": rca.status,
+            "reviewed_by": rca.reviewed_by,
+            "reviewed_at": _serialize_datetime(rca.reviewed_at),
+        })
+
+    from google.cloud.firestore import SERVER_TIMESTAMP
+
+    return {
+        "incident_id": incident.id,
+        "start_time": _serialize_datetime(incident.start_time),
+        "end_time": _serialize_datetime(incident.end_time),
+        "severity": incident.severity,
+        "status": incident.status,
+        "summary": incident.summary,
+        "suspected_root_cause": incident.suspected_root_cause,
+        "impact_scope": incident.impact_scope,
+        "owner": incident.owner,
+        "created_by": incident.created_by,
+        "tenant_id": incident.tenant_id,
+        "alert_count": len(alert_dicts),
+        "alerts": alert_dicts,
+        "rca_artifacts": rca_dicts,
+        "updated_at": SERVER_TIMESTAMP,
+    }
+
+
+def _sync_worker(incident_id: str) -> None:
+    """Background worker that syncs a single incident to Firestore.
+
+    Opens a fresh SQLAlchemy session to avoid thread-safety issues
+    with the request-scoped session.
+    """
+    if _db is None:
+        return
+
+    try:
+        from teleops.db import SessionLocal
+
+        db_session = SessionLocal()
+        try:
+            doc = _build_incident_doc(incident_id, db_session)
+            if doc is None:
+                return
+            _db.collection(_collection_name).document(incident_id).set(doc)
+            logger.info(f"Firestore sync OK: {incident_id}")
+        finally:
+            db_session.close()
+    except Exception:
+        logger.exception(f"Firestore sync failed for incident {incident_id}")
+
+
+def sync_incident_to_firestore(incident_id: str) -> None:
+    """Sync a single incident to Firestore in a background thread.
+
+    Safe to call even if Firestore is not configured -- returns immediately.
+    """
+    if _db is None:
+        return
+
+    thread = threading.Thread(
+        target=_sync_worker,
+        args=(incident_id,),
+        daemon=True,
+        name=f"firestore-sync-{incident_id[:20]}",
+    )
+    thread.start()
+
+
+def sync_incidents_to_firestore(incident_ids: list[str]) -> None:
+    """Sync multiple incidents to Firestore.
+
+    Each incident is synced in its own background thread.
+    """
+    if _db is None:
+        return
+
+    for incident_id in incident_ids:
+        sync_incident_to_firestore(incident_id)
+
+
+def _delete_worker() -> None:
+    """Background worker that deletes all documents from the Firestore collection."""
+    if _db is None:
+        return
+
+    try:
+        collection_ref = _db.collection(_collection_name)
+        # Firestore doesn't have a bulk delete -- iterate in batches
+        batch_size = 100
+        while True:
+            docs = collection_ref.limit(batch_size).stream()
+            deleted = 0
+            for doc in docs:
+                doc.reference.delete()
+                deleted += 1
+            if deleted < batch_size:
+                break
+        logger.info(f"Firestore collection '{_collection_name}' cleared")
+    except Exception:
+        logger.exception("Firestore delete_all failed")
+
+
+def delete_all_from_firestore() -> None:
+    """Delete all documents from the Firestore incidents collection.
+
+    Runs in a background thread. Used by the /reset endpoint.
+    """
+    if _db is None:
+        return
+
+    thread = threading.Thread(
+        target=_delete_worker,
+        daemon=True,
+        name="firestore-delete-all",
+    )
+    thread.start()

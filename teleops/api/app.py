@@ -19,6 +19,12 @@ from sqlalchemy.orm import Session
 from teleops.config import logger, settings
 from teleops.data_gen.generator import ScenarioConfig, generate_scenario
 from teleops.db import SessionLocal
+from teleops.firestore_sync import (
+    delete_all_from_firestore,
+    init_firestore,
+    sync_incident_to_firestore,
+    sync_incidents_to_firestore,
+)
 from teleops.incident_corr.correlator import correlate_alerts
 from teleops.init_db import init_db
 from teleops.llm.rca import baseline_rca, llm_rca
@@ -78,10 +84,11 @@ class ReviewRequest(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize database tables on startup."""
+    """Initialize database tables and Firestore on startup."""
     logger.info("Initializing database...")
     init_db()
     logger.info("Database initialized")
+    init_firestore()
     yield
 
 
@@ -371,6 +378,9 @@ def generate_alerts(
     alert_ids = [model.id for model in alert_models]
     incidents = correlate_alerts(db, alert_ids=alert_ids)
 
+    # Sync new incidents to Firestore (background, non-blocking)
+    sync_incidents_to_firestore([i.id for i in incidents])
+
     logger.info(f"Generated {len(alert_models)} alerts, {len(incidents)} incidents")
 
     return {
@@ -436,6 +446,10 @@ def reset_data(
     db.query(Incident).delete()
     db.query(Alert).delete()
     db.commit()
+
+    # Clear Firestore collection (background, non-blocking)
+    delete_all_from_firestore()
+
     return {"status": "ok"}
 
 
@@ -472,6 +486,9 @@ def generate_baseline_rca(
     )
     db.add(artifact)
     db.commit()
+
+    # Sync updated incident (now includes RCA artifact) to Firestore
+    sync_incident_to_firestore(incident.id)
 
     result["duration_ms"] = duration_ms
     result["artifact_id"] = artifact.id
@@ -544,6 +561,9 @@ def generate_llm_rca(
     )
     db.add(artifact)
     db.commit()
+
+    # Sync updated incident (now includes LLM RCA artifact) to Firestore
+    sync_incident_to_firestore(incident.id)
 
     result["duration_ms"] = duration_ms
     result["artifact_id"] = artifact.id
@@ -739,6 +759,9 @@ def review_rca_artifact(
     artifact.reviewed_by = payload.reviewed_by
     artifact.reviewed_at = now
     db.commit()
+
+    # Sync updated incident (RCA review status changed) to Firestore
+    sync_incident_to_firestore(artifact.incident_id)
 
     _append_audit_event({
         "action": "rca_review",

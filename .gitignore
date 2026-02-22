@@ -17,6 +17,9 @@ venv312/
 # Environment
 .env
 
+# Firebase service account key (contains private key)
+config/serviceAccountKey.json
+
 # Data and logs
 teleops.db
 storage/*

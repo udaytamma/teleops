@@ -54,6 +54,13 @@ class Settings(BaseSettings):
     require_tenant_id: bool = False
     teleops_tenant_id: str | None = Field(default=None, alias="TELEOPS_TENANT_ID")
 
+    # Firestore (persistent cloud sync -- survives Railway redeploys)
+    firestore_enabled: bool = False
+    firestore_project_id: str | None = None
+    firestore_collection: str = "teleops_incidents"
+    firestore_credentials_file: str | None = None  # Path to service account JSON (local dev)
+    firestore_credentials_json: str | None = None  # Base64-encoded service account JSON (Railway/CI)
+
     # CORS
     cors_origins: list[str] = Field(default=["http://localhost:8501", "http://localhost:3000"])
 
