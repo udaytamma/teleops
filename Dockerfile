@@ -16,9 +16,13 @@ COPY teleops/ teleops/
 COPY docs/ docs/
 COPY ui/ ui/
 
-# Create storage directory and non-root user
-RUN mkdir -p storage && \
-    useradd -m teleops && chown -R teleops:teleops /app
+# Copy tracked storage files (test results, evaluation results, benchmarks)
+# then ensure storage dir exists for runtime-generated files
+COPY storage/evaluation_results.json storage/test_results.json storage/
+COPY storage/benchmarks/ storage/benchmarks/
+
+# Create non-root user
+RUN useradd -m teleops && chown -R teleops:teleops /app
 USER teleops
 
 # Default port (Railway overrides via $PORT env var)

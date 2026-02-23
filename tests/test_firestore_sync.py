@@ -367,3 +367,220 @@ class TestDeleteAll:
             assert mock_doc2.reference.delete.called
         finally:
             fs_module._db = original_db
+
+
+class TestParseIsoDatetime:
+    """Test _parse_iso_datetime helper."""
+
+    def test_parses_naive_iso(self):
+        from teleops.firestore_sync import _parse_iso_datetime
+
+        result = _parse_iso_datetime("2026-02-22T10:00:00")
+        assert result == datetime(2026, 2, 22, 10, 0, 0)
+
+    def test_parses_tz_aware_iso(self):
+        from teleops.firestore_sync import _parse_iso_datetime
+
+        result = _parse_iso_datetime("2026-02-22T10:00:00+00:00")
+        assert result == datetime(2026, 2, 22, 10, 0, 0, tzinfo=timezone.utc)
+
+    def test_returns_none_for_none(self):
+        from teleops.firestore_sync import _parse_iso_datetime
+
+        assert _parse_iso_datetime(None) is None
+
+    def test_returns_none_for_empty(self):
+        from teleops.firestore_sync import _parse_iso_datetime
+
+        assert _parse_iso_datetime("") is None
+
+    def test_returns_none_for_invalid(self):
+        from teleops.firestore_sync import _parse_iso_datetime
+
+        assert _parse_iso_datetime("not-a-date") is None
+
+
+class TestRestoreFromFirestore:
+    """Test restore_from_firestore startup hydration."""
+
+    def test_noop_when_db_is_none(self):
+        """Should return 0 when Firestore client is not initialized."""
+        import teleops.firestore_sync as fs_module
+
+        original_db = fs_module._db
+        fs_module._db = None
+        try:
+            assert fs_module.restore_from_firestore() == 0
+        finally:
+            fs_module._db = original_db
+
+    def test_skips_when_sqlite_has_data(self, db_session, sample_incident):
+        """Should skip restore when SQLite already has incidents."""
+        import teleops.firestore_sync as fs_module
+
+        original_db = fs_module._db
+        fs_module._db = MagicMock()  # Non-None = Firestore "initialized"
+
+        mock_session_factory = MagicMock(return_value=db_session)
+        try:
+            with patch("teleops.db.SessionLocal", mock_session_factory):
+                result = fs_module.restore_from_firestore()
+            assert result == 0
+        finally:
+            fs_module._db = original_db
+
+    def test_skips_when_firestore_empty(self, db_session):
+        """Should return 0 when Firestore collection has no documents."""
+        import teleops.firestore_sync as fs_module
+
+        original_db = fs_module._db
+        mock_firestore_db = MagicMock()
+        mock_collection = MagicMock()
+        mock_collection.stream.return_value = iter([])
+        mock_firestore_db.collection.return_value = mock_collection
+        fs_module._db = mock_firestore_db
+
+        # db_session has no incidents (empty SQLite)
+        mock_session_factory = MagicMock(return_value=db_session)
+        try:
+            with patch("teleops.db.SessionLocal", mock_session_factory):
+                result = fs_module.restore_from_firestore()
+            assert result == 0
+        finally:
+            fs_module._db = original_db
+
+    def test_restores_incident_with_alerts_and_rca(self, db_session):
+        """Should restore a full incident from Firestore into empty SQLite."""
+        import teleops.firestore_sync as fs_module
+
+        # Build a mock Firestore document matching the serialized format
+        firestore_doc_data = {
+            "incident_id": "restored_incident_001",
+            "start_time": "2026-02-22T10:00:00+00:00",
+            "end_time": "2026-02-22T10:10:00+00:00",
+            "severity": "critical",
+            "status": "open",
+            "summary": "Restored from Firestore",
+            "suspected_root_cause": "Network congestion",
+            "impact_scope": "network",
+            "owner": "noc-team",
+            "created_by": "correlator",
+            "tenant_id": None,
+            "alerts": [
+                {
+                    "id": "alert-restored-1",
+                    "timestamp": "2026-02-22T10:01:00+00:00",
+                    "source_system": "prometheus",
+                    "host": "core-router-1",
+                    "service": "routing",
+                    "severity": "critical",
+                    "alert_type": "packet_loss",
+                    "message": "High packet loss detected",
+                    "tags": {"region": "us-east"},
+                },
+            ],
+            "rca_artifacts": [
+                {
+                    "id": "rca-restored-1",
+                    "hypotheses": ["Network congestion on core-router-1"],
+                    "evidence": {"pattern": "packet_loss > 5%"},
+                    "confidence_scores": {"Network congestion on core-router-1": 0.9},
+                    "llm_model": "gemini-2.0-flash",
+                    "timestamp": "2026-02-22T10:05:00+00:00",
+                    "duration_ms": 7500.0,
+                    "status": "accepted",
+                    "reviewed_by": "uday.tamma",
+                    "reviewed_at": "2026-02-22T10:06:00+00:00",
+                },
+            ],
+        }
+
+        mock_doc = MagicMock()
+        mock_doc.id = "restored_incident_001"
+        mock_doc.to_dict.return_value = firestore_doc_data
+
+        original_db = fs_module._db
+        mock_firestore_db = MagicMock()
+        mock_collection = MagicMock()
+        mock_collection.stream.return_value = iter([mock_doc])
+        mock_firestore_db.collection.return_value = mock_collection
+        fs_module._db = mock_firestore_db
+
+        mock_session_factory = MagicMock(return_value=db_session)
+        try:
+            with patch("teleops.db.SessionLocal", mock_session_factory):
+                result = fs_module.restore_from_firestore()
+
+            assert result == 1
+
+            # Verify incident was restored
+            incident = db_session.query(Incident).filter(
+                Incident.id == "restored_incident_001"
+            ).first()
+            assert incident is not None
+            assert incident.severity == "critical"
+            assert incident.summary == "Restored from Firestore"
+            assert incident.suspected_root_cause == "Network congestion"
+
+            # Verify alert was restored
+            alert = db_session.query(Alert).filter(
+                Alert.id == "alert-restored-1"
+            ).first()
+            assert alert is not None
+            assert alert.host == "core-router-1"
+            assert alert.severity == "critical"
+
+            # Verify RCA artifact was restored
+            rca = db_session.query(RCAArtifact).filter(
+                RCAArtifact.id == "rca-restored-1"
+            ).first()
+            assert rca is not None
+            assert rca.status == "accepted"
+            assert rca.reviewed_by == "uday.tamma"
+            assert rca.duration_ms == 7500.0
+
+        finally:
+            fs_module._db = original_db
+
+    def test_handles_corrupt_document_gracefully(self, db_session):
+        """Should skip corrupt documents and continue restoring others."""
+        import teleops.firestore_sync as fs_module
+
+        # One good doc, one corrupt doc (missing incident_id)
+        good_doc = MagicMock()
+        good_doc.id = "good_incident"
+        good_doc.to_dict.return_value = {
+            "incident_id": "good_incident",
+            "start_time": "2026-02-22T10:00:00+00:00",
+            "severity": "high",
+            "status": "open",
+            "summary": "Good incident",
+            "alerts": [],
+            "rca_artifacts": [],
+        }
+
+        bad_doc = MagicMock()
+        bad_doc.id = "bad_incident"
+        bad_doc.to_dict.side_effect = Exception("Corrupt document")
+
+        original_db = fs_module._db
+        mock_firestore_db = MagicMock()
+        mock_collection = MagicMock()
+        mock_collection.stream.return_value = iter([bad_doc, good_doc])
+        mock_firestore_db.collection.return_value = mock_collection
+        fs_module._db = mock_firestore_db
+
+        mock_session_factory = MagicMock(return_value=db_session)
+        try:
+            with patch("teleops.db.SessionLocal", mock_session_factory):
+                result = fs_module.restore_from_firestore()
+
+            # Should restore 1 out of 2 (bad doc skipped)
+            assert result == 1
+            incident = db_session.query(Incident).filter(
+                Incident.id == "good_incident"
+            ).first()
+            assert incident is not None
+
+        finally:
+            fs_module._db = original_db

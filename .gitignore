@@ -23,6 +23,7 @@ config/serviceAccountKey.json
 # Data and logs
 teleops.db
 storage/*
+!storage/test_results.json
 !storage/evaluation_results.json
 !storage/benchmarks/
 !storage/benchmarks/rca_latency.json

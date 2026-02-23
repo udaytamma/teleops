@@ -1,0 +1,25 @@
+{
+  "status": "passed",
+  "coverage": {
+    "percent_covered": 78.66
+  },
+  "tests": {
+    "total": 55,
+    "passed": 55,
+    "failed": 0,
+    "skipped": 0,
+    "pass_rate": 1.0
+  },
+  "thresholds": {
+    "pass_rate": {
+      "actual": 1.0,
+      "required": 0.9,
+      "met": true
+    },
+    "coverage": {
+      "actual": 78.66,
+      "required": 74.0,
+      "met": true
+    }
+  }
+}
