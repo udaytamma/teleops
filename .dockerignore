@@ -30,8 +30,12 @@ htmlcov
 teleops.db
 *.db
 
-# Storage (created at runtime)
-storage/
+# Storage (exclude runtime artifacts, keep tracked data files)
+storage/*
+!storage/test_results.json
+!storage/evaluation_results.json
+!storage/benchmarks/
+!storage/benchmarks/rca_latency.json
 
 # Logs and temp files
 storage/api.log
