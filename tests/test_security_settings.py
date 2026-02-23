@@ -1,5 +1,3 @@
-import pytest
-
 from teleops.config import Settings
 
 

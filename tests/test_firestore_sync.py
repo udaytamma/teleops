@@ -226,8 +226,6 @@ class TestErrorHandling:
                 with patch("teleops.db.SessionLocal", mock_session_factory):
                     # _sync_worker imports SessionLocal from teleops.db
                     # We need to also patch it at the point of use
-                    original_sync_worker = fs_module._sync_worker
-
                     def patched_sync_worker(incident_id):
                         """Run sync worker with patched SessionLocal."""
                         try:
