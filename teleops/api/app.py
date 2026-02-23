@@ -22,6 +22,7 @@ from teleops.db import SessionLocal
 from teleops.firestore_sync import (
     delete_all_from_firestore,
     init_firestore,
+    restore_from_firestore,
     sync_incident_to_firestore,
     sync_incidents_to_firestore,
 )
@@ -84,11 +85,15 @@ class ReviewRequest(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize database tables and Firestore on startup."""
+    """Initialize database tables, Firestore, and restore data on startup."""
     logger.info("Initializing database...")
     init_db()
     logger.info("Database initialized")
     init_firestore()
+    # Restore data from Firestore if SQLite is empty (e.g., after Railway redeploy)
+    restored = restore_from_firestore()
+    if restored > 0:
+        logger.info(f"Restored {restored} incidents from Firestore")
     yield
 
 

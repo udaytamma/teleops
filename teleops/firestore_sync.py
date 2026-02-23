@@ -1,9 +1,13 @@
 """Firestore sync layer for persistent incident storage.
 
-Implements a fire-and-forget dual-write pattern: SQLite is the primary
+Implements a dual-write + startup-restore pattern: SQLite is the primary
 database for all reads/writes; Firestore receives denormalized incident
 documents in background threads so data survives Railway's ephemeral
 filesystem across deploys.
+
+On startup, if SQLite is empty but Firestore has data, the restore
+function hydrates SQLite from Firestore (synchronous, blocking). This
+ensures the API never serves empty data after a Railway redeploy.
 
 If Firestore is not configured or encounters errors, the API continues
 to operate normally -- all sync operations log warnings but never raise.
@@ -272,3 +276,134 @@ def delete_all_from_firestore() -> None:
         name="firestore-delete-all",
     )
     thread.start()
+
+
+def _parse_iso_datetime(value: str | None) -> datetime | None:
+    """Parse an ISO 8601 datetime string back to a datetime object.
+
+    Handles both timezone-aware and naive ISO strings. Returns None
+    for None or unparseable values.
+    """
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except (ValueError, TypeError):
+        logger.warning(f"Could not parse datetime: {value!r}")
+        return None
+
+
+def restore_from_firestore() -> int:
+    """Restore incidents, alerts, and RCA artifacts from Firestore into SQLite.
+
+    Called synchronously on startup. Only runs when:
+    1. Firestore client is initialized (_db is not None)
+    2. SQLite has zero incidents (fresh deploy / wiped filesystem)
+
+    Returns the number of incidents restored (0 if skipped or failed).
+    """
+    if _db is None:
+        return 0
+
+    try:
+        from teleops.db import SessionLocal
+        from teleops.models import Alert, Incident, RCAArtifact
+
+        db_session = SessionLocal()
+        try:
+            # Check if SQLite already has data -- skip restore if so
+            existing_count = db_session.query(Incident).count()
+            if existing_count > 0:
+                logger.info(
+                    f"SQLite has {existing_count} incidents -- skipping Firestore restore"
+                )
+                return 0
+
+            # Fetch all documents from Firestore
+            docs = _db.collection(_collection_name).stream()
+            doc_list = list(docs)
+
+            if not doc_list:
+                logger.info("Firestore collection is empty -- nothing to restore")
+                return 0
+
+            logger.info(f"Restoring {len(doc_list)} incidents from Firestore...")
+            restored = 0
+
+            for doc in doc_list:
+                try:
+                    data = doc.to_dict()
+
+                    # Restore alerts first (incidents reference them by ID)
+                    alert_ids = []
+                    for alert_data in data.get("alerts", []):
+                        alert = Alert(
+                            id=alert_data["id"],
+                            timestamp=_parse_iso_datetime(alert_data.get("timestamp")),
+                            source_system=alert_data.get("source_system", ""),
+                            host=alert_data.get("host", ""),
+                            service=alert_data.get("service", ""),
+                            severity=alert_data.get("severity", "info"),
+                            alert_type=alert_data.get("alert_type", ""),
+                            message=alert_data.get("message", ""),
+                            tags=alert_data.get("tags", {}),
+                            raw_payload={},
+                            tenant_id=data.get("tenant_id"),
+                        )
+                        db_session.merge(alert)  # merge avoids duplicate key errors
+                        alert_ids.append(alert_data["id"])
+
+                    # Restore incident
+                    incident = Incident(
+                        id=data["incident_id"],
+                        start_time=_parse_iso_datetime(data.get("start_time")),
+                        end_time=_parse_iso_datetime(data.get("end_time")),
+                        severity=data.get("severity", "info"),
+                        status=data.get("status", "open"),
+                        related_alert_ids=alert_ids,
+                        summary=data.get("summary", ""),
+                        suspected_root_cause=data.get("suspected_root_cause"),
+                        impact_scope=data.get("impact_scope"),
+                        owner=data.get("owner"),
+                        created_by=data.get("created_by", "system"),
+                        tenant_id=data.get("tenant_id"),
+                    )
+                    db_session.merge(incident)
+
+                    # Restore RCA artifacts
+                    for rca_data in data.get("rca_artifacts", []):
+                        rca = RCAArtifact(
+                            id=rca_data["id"],
+                            incident_id=data["incident_id"],
+                            hypotheses=rca_data.get("hypotheses", []),
+                            evidence=rca_data.get("evidence", {}),
+                            confidence_scores=rca_data.get("confidence_scores", {}),
+                            llm_model=rca_data.get("llm_model", "unknown"),
+                            timestamp=_parse_iso_datetime(rca_data.get("timestamp")),
+                            duration_ms=rca_data.get("duration_ms"),
+                            status=rca_data.get("status", "pending_review"),
+                            reviewed_by=rca_data.get("reviewed_by"),
+                            reviewed_at=_parse_iso_datetime(rca_data.get("reviewed_at")),
+                        )
+                        db_session.merge(rca)
+
+                    restored += 1
+
+                except Exception:
+                    logger.exception(
+                        f"Failed to restore incident {doc.id} -- skipping"
+                    )
+                    continue
+
+            db_session.commit()
+            logger.info(
+                f"Firestore restore complete: {restored}/{len(doc_list)} incidents restored"
+            )
+            return restored
+
+        finally:
+            db_session.close()
+
+    except Exception:
+        logger.exception("Firestore restore failed -- API will start with empty data")
+        return 0
