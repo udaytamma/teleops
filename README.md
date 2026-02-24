@@ -34,7 +34,7 @@ TeleOps demonstrates AI-augmented incident management for telecom Network Operat
 | Layer | Technology |
 |-------|------------|
 | **API** | FastAPI with Pydantic validation |
-| **LLM** | Google Gemini 2.0 Flash |
+| **LLM** | Google Gemini 3 Flash (Preview) |
 | **RAG** | LlamaIndex + HuggingFace embeddings |
 | **Dashboard** | Streamlit with NOC-style theme |
 | **Database** | SQLite (MVP) |

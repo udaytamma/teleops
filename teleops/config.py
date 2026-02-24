@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     # LLM provider selection
     # local_telellm | hosted_telellm | gemini
     llm_provider: str = "gemini"
-    llm_model: str = "gemini-2.0-flash"
+    llm_model: str = "gemini-3-flash-preview"
     llm_timeout_seconds: float = 60.0
 
     # OpenAI-compatible endpoint for local/hosted Tele-LLM

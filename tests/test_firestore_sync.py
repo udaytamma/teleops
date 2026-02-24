@@ -485,7 +485,7 @@ class TestRestoreFromFirestore:
                     "hypotheses": ["Network congestion on core-router-1"],
                     "evidence": {"pattern": "packet_loss > 5%"},
                     "confidence_scores": {"Network congestion on core-router-1": 0.9},
-                    "llm_model": "gemini-2.0-flash",
+                    "llm_model": "gemini-3-flash-preview",
                     "timestamp": "2026-02-22T10:05:00+00:00",
                     "duration_ms": 7500.0,
                     "status": "accepted",
