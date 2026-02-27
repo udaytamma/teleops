@@ -33,6 +33,43 @@ class LLMClientError(RuntimeError):
     pass
 
 
+def _safe_extract_text(response) -> str:
+    """Safely extract text from a Gemini API response.
+
+    The response.text property can raise ValueError when the response
+    contains no text parts (e.g., multipart response with only tool calls).
+
+    Args:
+        response: Gemini GenerateContentResponse object.
+
+    Returns:
+        Extracted text string.
+
+    Raises:
+        LLMClientError: If no text could be extracted.
+    """
+    try:
+        text = response.text
+        if text:
+            return text
+    except (ValueError, AttributeError):
+        pass
+
+    # Fallback: try to extract text from response parts directly
+    try:
+        parts = []
+        for candidate in response.candidates:
+            for part in candidate.content.parts:
+                if hasattr(part, "text") and part.text:
+                    parts.append(part.text)
+        if parts:
+            return "\n".join(parts)
+    except Exception:
+        pass
+
+    raise LLMClientError("Gemini returned no text content")
+
+
 class BaseLLMClient:
     def generate(self, prompt: str) -> dict[str, Any]:
         raise NotImplementedError
@@ -125,8 +162,9 @@ class GeminiClient(BaseLLMClient):
         except TypeError:
             # Older SDKs may not support request_options
             response = model.generate_content(prompt, generation_config=generation_config)
-        logger.info(f"Gemini response received, parsing JSON ({len(response.text)} chars)")
-        return _parse_json_response(response.text)
+        text = _safe_extract_text(response)
+        logger.info(f"Gemini response received, parsing JSON ({len(text)} chars)")
+        return _parse_json_response(text)
 
 
 def get_llm_client() -> BaseLLMClient:
