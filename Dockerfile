@@ -20,6 +20,9 @@ COPY ui/ ui/
 # then ensure storage dir exists for runtime-generated files
 COPY storage/evaluation_results.json storage/test_results.json storage/
 COPY storage/benchmarks/ storage/benchmarks/
+# Pre-built RAG index (~2MB). Avoids 155 Gemini embedding calls on every cold start,
+# which was exhausting the free-tier quota and causing 429s on LLM RCA requests.
+COPY storage/rag_index/ storage/rag_index/
 
 # Create non-root user
 RUN useradd -m teleops && chown -R teleops:teleops /app
