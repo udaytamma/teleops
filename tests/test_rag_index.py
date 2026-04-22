@@ -51,11 +51,14 @@ class DummyReader:
 
 
 class DummyEmbed:
-    def __init__(self, model_name: str):
-        self.model_name = model_name
+    """Stand-in for a LlamaIndex BaseEmbedding subclass."""
+
+    model_name = "dummy-model"
 
 
 def _fake_require_llama_index():
+    # Returns: (SimpleDirectoryReader, StorageContext, VectorStoreIndex,
+    #          load_index_from_storage, BaseEmbedding, SimpleVectorStore)
     return (
         DummyReader,
         DummyStorageContext,
@@ -64,6 +67,10 @@ def _fake_require_llama_index():
         DummyEmbed,
         object,
     )
+
+
+def _fake_make_gemini_embedding(_base_embedding_cls):
+    return DummyEmbed()
 
 
 def test_build_or_load_index_creates_and_retrieves(tmp_path, monkeypatch):
@@ -75,6 +82,9 @@ def test_build_or_load_index_creates_and_retrieves(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "rag_corpus_dir", str(corpus_dir))
     monkeypatch.setattr(settings, "rag_index_dir", str(index_dir))
     monkeypatch.setattr(index, "_require_llama_index", _fake_require_llama_index)
+    monkeypatch.setattr(index, "_make_gemini_embedding", _fake_make_gemini_embedding)
+    # Reset the module-level cache so each test gets a fresh build path
+    monkeypatch.setattr(index, "_INDEX", None)
 
     built = index.build_or_load_index()
     assert isinstance(built, DummyIndex)
@@ -93,6 +103,9 @@ def test_build_or_load_index_uses_existing(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "rag_corpus_dir", str(corpus_dir))
     monkeypatch.setattr(settings, "rag_index_dir", str(index_dir))
     monkeypatch.setattr(index, "_require_llama_index", _fake_require_llama_index)
+    monkeypatch.setattr(index, "_make_gemini_embedding", _fake_make_gemini_embedding)
+    # Reset the module-level cache so each test gets a fresh build path
+    monkeypatch.setattr(index, "_INDEX", None)
 
     built = index.build_or_load_index()
     assert isinstance(built, DummyIndex)
