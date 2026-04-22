@@ -859,14 +859,44 @@ def safe_json(resp, fallback=None):
         return fallback
 
 
+def _hashable_headers(headers: dict | None) -> tuple:
+    """Convert headers dict to hashable tuple so it can be a cache key."""
+    if not headers:
+        return ()
+    return tuple(sorted(headers.items()))
+
+
+def _probe_api_health(api_url: str, headers_key: tuple) -> tuple[bool, str]:
+    """Internal health probe. Returns (ok, error_message).
+
+    Cached at module import time so every Streamlit rerun does NOT issue a
+    fresh /health request to the backend API. On Railway serverless this
+    change alone meaningfully reduces how often the API container is kept
+    warm -- without a cache, every tab switch and form interaction fired
+    a /health call, preventing scale-to-zero.
+    """
+    import streamlit as st
+
+    @st.cache_data(ttl=30, show_spinner=False)
+    def _cached(api_url_inner: str, headers_key_inner: tuple) -> tuple[bool, str]:
+        hdrs = dict(headers_key_inner)
+        resp, err_inner = safe_api_call("GET", f"{api_url_inner}/health", headers=hdrs, timeout=10)
+        return (err_inner is None, err_inner or "")
+
+    return _cached(api_url, headers_key)
+
+
 def check_api_connection(api_url: str, headers: dict | None = None) -> bool:
     """Check if the API backend is reachable. Returns True if healthy, False otherwise.
 
     If unreachable, renders a full-width error banner and calls st.stop().
+
+    Result is cached for 30 seconds per (api_url, headers) pair. To force a
+    fresh probe call `st.cache_data.clear()` from the caller.
     """
     import streamlit as st
 
-    resp, err = safe_api_call("GET", f"{api_url}/health", headers=headers or {}, timeout=10)
+    _ok, err = _probe_api_health(api_url, _hashable_headers(headers))
     if err:
         st.markdown(
             f"""
