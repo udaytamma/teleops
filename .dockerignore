@@ -36,6 +36,8 @@ storage/*
 !storage/evaluation_results.json
 !storage/benchmarks/
 !storage/benchmarks/rca_latency.json
+!storage/rag_index/
+!storage/rag_index/**
 
 # Logs and temp files
 storage/api.log
